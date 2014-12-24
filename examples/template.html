@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+<script>
+setInterval(function(){
+	$(".cell").each(function(i){
+		$(this).attr("src", "/screen?date="+new Date().getTime());
+	});
+},500);
+
+$(document).ready(function() {
+	  $(".cell").each(function(i){
+		 $(this).click(function(e) {
+			var offset = $(this).offset();
+			x= e.clientX - offset.left
+			y= e.clientY - offset.top
+			 $.get("/touch?x="+x+"&y="+y,
+			 function(data,status){
+				console.log("Status: " + status);
+			});
+		});
+	 });
+});
+
+
+</script>
+</head>
+<body>
+<ul>
+    <img class="cell" width=800 height=600/>
+</ul>
+</body>
+</html>

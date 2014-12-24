@@ -1,4 +1,4 @@
-package Cell
+package cell
 
 import (
 	"bufio"
@@ -6,33 +6,36 @@ import (
 	"net"
 )
 
+// CellAdvisor represents connection status with JDSU CellAdvisor devices
+// It could only made by NewCellAdvisor(ip string) function
 type CellAdvisor struct {
 	ip     string
 	reader *bufio.Reader
 	writer *bufio.Writer
 }
 
-func (self CellAdvisor) SendMessage(cmd byte, data string) {
+// SendMessage could send single cmd byte, and data strings
+func (cl CellAdvisor) SendMessage(cmd byte, data string) {
 
-	sending_msg := ""
-	sending_msg = string([]byte{0x7f, 'C', cmd, 0x01, 0x01})
+	seningMsg := ""
+	seningMsg = string([]byte{0x7f, 'C', cmd, 0x01, 0x01})
 	if data != "" {
-		sending_msg += data
+		seningMsg += data
 	}
-	sending_msg += string(self.getChecksum(sending_msg[1:]))
-	sending_msg += string([]byte{0x7e})
+	seningMsg += string(cl.getChecksum(seningMsg[1:]))
+	seningMsg += string([]byte{0x7e})
 
-	fmt.Fprintf(self.writer, string(sending_msg))
-	self.writer.Flush()
+	fmt.Fprintf(cl.writer, string(seningMsg))
+	cl.writer.Flush()
 }
 
-func (self CellAdvisor) GetMessage() []byte {
+func (cl CellAdvisor) GetMessage() []byte {
 
-	is_marked := false
-	result, buf_result := []byte{}, []byte{}
-	message_continue := true
-	for message_continue {
-		ret, err := self.reader.ReadBytes(0x7e)
+	isMarked := false
+	result, bufResult := []byte{}, []byte{}
+	messageContinue := true
+	for messageContinue {
+		ret, err := cl.reader.ReadBytes(0x7e)
 		if err != nil {
 			panic(err)
 		}
@@ -42,49 +45,49 @@ func (self CellAdvisor) GetMessage() []byte {
 		} else {
 			ret = ret[:len(ret)-2]
 		}
-		buf_result = append(buf_result, ret[5:]...)
+		bufResult = append(bufResult, ret[5:]...)
 		if ret[3] <= ret[4]+1 {
-			message_continue = false
+			messageContinue = false
 		}
 	}
 
 buffer_loop:
-	for _, value := range buf_result {
+	for _, value := range bufResult {
 		if value == '}' {
-			is_marked = true
+			isMarked = true
 			continue buffer_loop
-		} else if is_marked {
+		} else if isMarked {
 			switch value {
 			case 93, 94, 95:
 				value = value ^ 0x20
 			}
-			is_marked = false
+			isMarked = false
 		}
 		result = append(result, byte(value))
 	}
 	return result
 }
 
-func (self *CellAdvisor) initCellAdvisor() {
+func (cl *CellAdvisor) initCellAdvisor() {
 
-	conn, err := net.Dial("tcp", self.ip+":66")
+	conn, err := net.Dial("tcp", cl.ip+":66")
 	if err != nil {
 		panic(err)
 	}
 
-	self.reader, self.writer = bufio.NewReader(conn), bufio.NewWriter(conn)
+	cl.reader, cl.writer = bufio.NewReader(conn), bufio.NewWriter(conn)
 }
 
-func (self CellAdvisor) GetScreen() []byte {
-	self.SendMessage(0x60, "")
-	return self.GetMessage()
+func (cl CellAdvisor) GetScreen() []byte {
+	cl.SendMessage(0x60, "")
+	return cl.GetMessage()
 }
 
-func (self CellAdvisor) SendSCPI(scpicmd string) {
-	self.SendMessage(0x61, scpicmd+"\n")
+func (cl CellAdvisor) SendSCPI(scpicmd string) {
+	cl.SendMessage(0x61, scpicmd+"\n")
 }
 
-func (self CellAdvisor) getChecksum(data string) []byte {
+func (cl CellAdvisor) getChecksum(data string) []byte {
 	total := 0
 	for _, value := range data {
 		total += int(value)

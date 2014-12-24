@@ -1,0 +1,71 @@
+package main
+
+import (
+	"flag"
+	"fmt"
+	"log"
+	"strconv"
+	"sync"
+	"text/template"
+	"time"
+
+	"net/http"
+
+	"github.com/tomahawk28/cell"
+)
+
+var (
+	httpAddr        = flag.String("http", ":8040", "Listen Address")
+	cellAdvisorAddr = flag.String("celladdr", "10.82.26.174", "CellAdvisor Address")
+	pollPeriod      = flag.Duration("poll", 30*time.Second, "Poll Period")
+)
+
+func main() {
+	flag.Parse()
+	cell := cell.NewCellAdvisor(*cellAdvisorAddr)
+	http.HandleFunc("/screen", func(w http.ResponseWriter, req *http.Request) {
+		mu.Lock()
+		w.Header().Set("Content-Type", "image/jpeg")
+		w.Write(cell.GetScreen())
+		mu.Unlock()
+	})
+	http.HandleFunc("/touch", func(w http.ResponseWriter, req *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		query := req.URL.Query()
+		if query["x"] != nil && query["y"] != nil {
+			x, err := strconv.ParseFloat(query["x"][0], 32)
+			if err != nil {
+				fmt.Fprintf(w, "X is not float unit")
+				w.WriteHeader(404)
+				return
+			}
+
+			y, err := strconv.ParseFloat(query["y"][0], 32)
+			if err != nil {
+				fmt.Fprintf(w, "Y is not float unit")
+				w.WriteHeader(404)
+				return
+			}
+			scpicmd := fmt.Sprintf("KEYP %.0f %.0f", x, y)
+			log.Print(scpicmd)
+			cell.SendSCPI(scpicmd)
+			w.WriteHeader(200)
+		} else {
+			fmt.Fprintf(w, "Coordination not given")
+			w.WriteHeader(404)
+		}
+	})
+	http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
+		err := tmpl.Execute(w, nil)
+		if err != nil {
+			panic(err)
+		}
+	})
+	log.Fatal(http.ListenAndServe(*httpAddr, nil))
+}
+
+var (
+	tmpl = template.Must(template.ParseFiles("template.html"))
+	mu   = sync.RWMutex{}
+)
