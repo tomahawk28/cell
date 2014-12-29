@@ -37,14 +37,14 @@ func main() {
 			x, err := strconv.ParseFloat(query["x"][0], 32)
 			if err != nil {
 				fmt.Fprintf(w, "X is not float unit")
-				w.WriteHeader(404)
+				w.WriteHeader(http.StatusBadRequest)
 				return
 			}
 
 			y, err := strconv.ParseFloat(query["y"][0], 32)
 			if err != nil {
 				fmt.Fprintf(w, "Y is not float unit")
-				w.WriteHeader(404)
+				w.WriteHeader(http.StatusBadRequest)
 				return
 			}
 			scpicmd := fmt.Sprintf("KEYP %.0f %.0f", x, y)
@@ -53,7 +53,28 @@ func main() {
 			w.WriteHeader(200)
 		} else {
 			fmt.Fprintf(w, "Coordination not given")
-			w.WriteHeader(404)
+			w.WriteHeader(http.StatusBadRequest)
+		}
+	})
+	http.HandleFunc("/keyp", func(w http.ResponseWriter, req *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		err := req.ParseForm()
+		if err != nil {
+			fmt.Fprintf(w, "Form Parse error")
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		value := req.FormValue("value")
+
+		if value != "" {
+			scpicmd := fmt.Sprintf("KEYP:%s", value)
+			log.Print(scpicmd)
+			cell.SendSCPI(scpicmd)
+
+		} else {
+			fmt.Fprintf(w, "Keypad name not given")
+			w.WriteHeader(http.StatusBadRequest)
 		}
 	})
 	http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {

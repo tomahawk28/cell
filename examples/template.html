@@ -21,6 +21,18 @@ $(document).ready(function() {
 			});
 		});
 	 });
+	 
+	 $(".keyp").each(function(i){
+		 $(this).click(function(e) {
+			$.ajax({
+				url: "/keyp",
+				type: 'POST',
+				data: {value: $(this).attr("value")},
+				success: function (result){
+				}
+			});
+		});
+	 });
 });
 
 
@@ -28,7 +40,56 @@ $(document).ready(function() {
 </head>
 <body>
 <ul>
-    <img class="cell" width=800 height=600/>
+   
+		<style type="text/css">
+	.tg  {border-collapse:collapse;border-spacing:0;}
+	.tg td{font-family:Arial, sans-serif;font-size:14px;padding:10px 5px;border-style:solid;border-width:1px;overflow:hidden;word-break:normal;text-align:center;}
+	.tg th{font-family:Arial, sans-serif;font-size:14px;font-weight:normal;padding:10px 5px;border-style:solid;border-width:1px;overflow:hidden;word-break:normal;}
+	.keyp {width: 80px;border-width: 2;}
+	</style>
+	<table class="tg">
+	  <tr>
+		<th class="tg-031e" colspan="6" rowspan="8" style="padding-bottom:0px; padding-top:0px">
+		<img class="cell" width="800" height="600"/>
+		</th>
+		<th class="tg-031e" style="height:36px">
+		</th>
+	  </tr>
+	  <tr>
+		<td class="tg-031e"></td>
+	  </tr>
+	  <tr>
+		<td class="tg-031e"></td>
+	  </tr>
+	  <tr>
+		<td class="tg-031e"></td>
+	  </tr>
+	  <tr>
+		<td class="tg-031e"></td>
+	  </tr>
+	  <tr>
+		<td class="tg-031e"></td>
+	  </tr>
+	  <tr>
+		<td class="tg-031e"></td>
+	  </tr>
+	  <tr>
+		<td class="tg-031e"></td>
+	  </tr>
+	  <tr>
+		<td class="tg-031e" colspan="6"></td>
+		<td class="tg-031e"></td>
+	  </tr>
+	  <tr>
+		<td class="tg-031e"><button class="keyp" value="MODE">Mode</button></td>
+		<td class="tg-031e"><button class="keyp" value="FREQ">Freq/Dist</button></td>
+		<td class="tg-031e"><button class="keyp" value="AMP">Amp/Scale</button></td>
+		<td class="tg-031e"><button class="keyp" value="BW">BW/AVG</button></td>
+		<td class="tg-031e"><button class="keyp" value="TRACE">Trace/ Display</button></td>
+		<td class="tg-031e"><button class="keyp" value="MARK">Marker</button></td>
+		<td class="tg-031e"><button class="keyp" value="PEAK">Peak Search</button></td>
+	  </tr>
+	</table>
 </ul>
 </body>
 </html>
