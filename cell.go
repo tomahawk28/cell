@@ -17,15 +17,15 @@ type CellAdvisor struct {
 // SendMessage could send single cmd byte, and data strings
 func (cl CellAdvisor) SendMessage(cmd byte, data string) {
 
-	seningMsg := ""
-	seningMsg = string([]byte{0x7f, 'C', cmd, 0x01, 0x01})
+	sendingMsg := ""
+	sendingMsg = string([]byte{0x7f, 'C', cmd, 0x01, 0x01})
 	if data != "" {
-		seningMsg += data
+		sendingMsg += data
 	}
-	seningMsg += string(cl.getChecksum(seningMsg[1:]))
-	seningMsg += string([]byte{0x7e})
+	sendingMsg += string(cl.getChecksum(sendingMsg[1:]))
+	sendingMsg += string([]byte{0x7e})
 
-	fmt.Fprintf(cl.writer, string(seningMsg))
+	fmt.Fprintf(cl.writer, string(sendingMsg))
 	cl.writer.Flush()
 }
 
@@ -83,6 +83,8 @@ func (cl CellAdvisor) GetScreen() []byte {
 	return cl.GetMessage()
 }
 
+// SendSCPI sends SCPI commands to CellAdvisor devices
+// (http://en.wikipedia.org/wiki/Standard_Commands_for_Programmable_Instruments)
 func (cl CellAdvisor) SendSCPI(scpicmd string) {
 	cl.SendMessage(0x61, scpicmd+"\n")
 }
@@ -100,6 +102,7 @@ func (cl CellAdvisor) getChecksum(data string) []byte {
 	return []byte{byte(buff)}
 }
 
+// NewCellAdvisor creates new CellAdvior object with given ip address
 func NewCellAdvisor(ip string) CellAdvisor {
 	cell := CellAdvisor{ip: ip}
 	cell.initCellAdvisor()

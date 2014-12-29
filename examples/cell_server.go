@@ -16,7 +16,7 @@ import (
 
 var (
 	httpAddr        = flag.String("http", ":8040", "Listen Address")
-	cellAdvisorAddr = flag.String("celladdr", "10.82.26.174", "CellAdvisor Address")
+	cellAdvisorAddr = flag.String("celladdr", "10.82.26.12", "CellAdvisor Address")
 	pollPeriod      = flag.Duration("poll", 30*time.Second, "Poll Period")
 )
 
