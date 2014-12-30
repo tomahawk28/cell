@@ -23,6 +23,18 @@ var (
 func main() {
 	flag.Parse()
 	cell := cell.NewCellAdvisor(*cellAdvisorAddr)
+
+	//Prevent socket closing after web page leaves
+	ticker := time.NewTicker(*pollPeriod)
+	go func() {
+		for _ = range ticker.C {
+			mu.Lock()
+			cell.SendMessage(0x50, "")
+			log.Println("Hearbeat msg: ", string(cell.GetMessage()))
+			mu.Unlock()
+		}
+	}()
+
 	http.HandleFunc("/screen", func(w http.ResponseWriter, req *http.Request) {
 		mu.Lock()
 		w.Header().Set("Content-Type", "image/jpeg")
