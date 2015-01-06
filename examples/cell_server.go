@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"strconv"
 	"sync"
 	"text/template"
 	"time"
@@ -45,21 +44,9 @@ func main() {
 		mu.Lock()
 		defer mu.Unlock()
 		query := req.URL.Query()
-		if query["x"] != nil && query["y"] != nil {
-			x, err := strconv.ParseFloat(query["x"][0], 32)
-			if err != nil {
-				fmt.Fprintf(w, "X is not float unit")
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-
-			y, err := strconv.ParseFloat(query["y"][0], 32)
-			if err != nil {
-				fmt.Fprintf(w, "Y is not float unit")
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-			scpicmd := fmt.Sprintf("KEYP %.0f %.0f", x, y)
+		x, y := query.Get("x"), query.Get("y")
+		if x != "" && y != "" {
+			scpicmd := fmt.Sprintf("KEYP %s %s", x, y)
 			log.Print(scpicmd)
 			cell.SendSCPI(scpicmd)
 			w.WriteHeader(200)
