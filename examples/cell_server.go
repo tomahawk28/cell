@@ -19,9 +19,27 @@ var (
 	pollPeriod      = flag.Duration("poll", 30*time.Second, "Poll Period")
 )
 
+type Request struct {
+	command string
+	args    map[string]string
+	result  chan []byte
+}
+
+func Poller(in <-chan Request, cell *CellAdvisor) {
+	for r := range in {
+		switch r.command {
+		case "scpi":
+		case "touch":
+		case "screen":
+		case "heartbeat":
+		}
+	}
+}
+
 func main() {
 	flag.Parse()
-	cell := cell.NewCellAdvisor(*cellAdvisorAddr)
+	cell_list := []CellAdvisor{cell.NewCellAdvisor(*cellAdvisorAddr), cell.NewCellAdvisor(*cellAdvisorAddr)}
+	//cell := cell.NewCellAdvisor(*cellAdvisorAddr)
 
 	//Prevent socket closing after web page leaves
 	ticker := time.NewTicker(*pollPeriod)
