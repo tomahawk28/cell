@@ -95,6 +95,8 @@ func main() {
 			panic(err)
 		}
 	})
+	fs := http.FileServer(http.Dir("static"))
+	http.Handle("/static/", http.StripPrefix("/static/", fs))
 	log.Fatal(http.ListenAndServe(*httpAddr, nil))
 }
 
