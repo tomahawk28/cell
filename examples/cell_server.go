@@ -25,57 +25,65 @@ type Request struct {
 	result  chan []byte
 }
 
-func Poller(in <-chan Request, cell *CellAdvisor) {
-	for r := range in {
-		switch r.command {
-		case "scpi":
-		case "touch":
-		case "screen":
-		case "heartbeat":
+func Poller(in <-chan *Request, cell *cell.CellAdvisor) {
+	for {
+		select {
+		case r := <-in:
+			switch r.command {
+			case "keyp":
+				scpicmd := fmt.Sprintf("KEYP:%s", r.args["value"])
+				cell.SendSCPI(scpicmd)
+				r.result <- []byte("")
+			case "touch":
+				scpicmd := fmt.Sprintf("KEYP %s %s", r.args["x"], r.args["y"])
+				cell.SendSCPI(scpicmd)
+				r.result <- []byte("")
+			case "screen":
+				r.result <- cell.GetScreen()
+			case "heartbeat":
+				cell.SendMessage(0x50, "")
+				r.result <- cell.GetMessage()
+			}
+		case <-time.After(time.Second * 20):
+			cell.SendMessage(0x50, "")
+			log.Println("Hearbeat:", string(cell.GetMessage()))
 		}
 	}
 }
 
+func NewRequest(command string, args map[string]string) *Request {
+	return &Request{command, args, make(chan []byte, 1)}
+}
+
 func main() {
 	flag.Parse()
-	cell_list := []CellAdvisor{cell.NewCellAdvisor(*cellAdvisorAddr), cell.NewCellAdvisor(*cellAdvisorAddr)}
+	cell_list := []cell.CellAdvisor{cell.NewCellAdvisor(*cellAdvisorAddr), cell.NewCellAdvisor(*cellAdvisorAddr)}
 	//cell := cell.NewCellAdvisor(*cellAdvisorAddr)
 
-	//Prevent socket closing after web page leaves
-	ticker := time.NewTicker(*pollPeriod)
-	go func() {
-		for _ = range ticker.C {
-			mu.Lock()
-			cell.SendMessage(0x50, "")
-			log.Println("Hearbeat msg: ", string(cell.GetMessage()))
-			mu.Unlock()
-		}
-	}()
+	request_channel := make(chan *Request, 20)
+	for i, _ := range cell_list {
+		go Poller(request_channel, &cell_list[i])
+	}
 
 	http.HandleFunc("/screen", func(w http.ResponseWriter, req *http.Request) {
-		mu.Lock()
 		w.Header().Set("Content-Type", "image/jpeg")
-		w.Write(cell.GetScreen())
-		mu.Unlock()
+		request_object := NewRequest("screen", nil)
+		request_channel <- request_object
+		w.Write(<-request_object.result)
 	})
 	http.HandleFunc("/touch", func(w http.ResponseWriter, req *http.Request) {
-		mu.Lock()
-		defer mu.Unlock()
 		query := req.URL.Query()
 		x, y := query.Get("x"), query.Get("y")
 		if x != "" && y != "" {
-			scpicmd := fmt.Sprintf("KEYP %s %s", x, y)
-			log.Print(scpicmd)
-			cell.SendSCPI(scpicmd)
-			w.WriteHeader(200)
+			request_object := NewRequest("touch", map[string]string{"x": x, "y": y})
+			request_channel <- request_object
+			w.Write(<-request_object.result)
 		} else {
 			fmt.Fprintf(w, "Coordination not given")
 			w.WriteHeader(http.StatusBadRequest)
 		}
 	})
 	http.HandleFunc("/keyp", func(w http.ResponseWriter, req *http.Request) {
-		mu.Lock()
-		defer mu.Unlock()
 		err := req.ParseForm()
 		if err != nil {
 			fmt.Fprintf(w, "Form Parse error")
@@ -85,9 +93,9 @@ func main() {
 		value := req.FormValue("value")
 
 		if value != "" {
-			scpicmd := fmt.Sprintf("KEYP:%s", value)
-			log.Print(scpicmd)
-			cell.SendSCPI(scpicmd)
+			request_object := NewRequest("keyp", map[string]string{"value": value})
+			request_channel <- request_object
+			w.Write(<-request_object.result)
 
 		} else {
 			fmt.Fprintf(w, "Keypad name not given")
