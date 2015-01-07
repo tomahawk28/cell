@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/base64"
 	"flag"
 	"fmt"
 	"log"
@@ -20,10 +19,22 @@ var (
 	pollPeriod      = flag.Duration("poll", 30*time.Second, "Poll Period")
 )
 
+var (
+	screenCache = ScreenCache{time.Now(), []byte{}, sync.RWMutex{}}
+	mu          = sync.Mutex{}
+	tmpl        = template.Must(template.ParseFiles("template.html"))
+)
+
 type Request struct {
 	command string
 	args    map[string]string
 	result  chan []byte
+}
+
+type ScreenCache struct {
+	last  time.Time
+	cache []byte
+	mu    sync.RWMutex
 }
 
 func Poller(in <-chan *Request, cell *cell.CellAdvisor, thread_number int) {
@@ -41,7 +52,13 @@ func Poller(in <-chan *Request, cell *cell.CellAdvisor, thread_number int) {
 				cell.SendSCPI(scpicmd)
 				r.result <- []byte("")
 			case "screen":
-				r.result <- cell.GetScreen()
+				screenCache.mu.Lock()
+				if time.Now().Sub(screenCache.last).Seconds() > 1 {
+					screenCache.last = time.Now()
+					screenCache.cache = cell.GetScreen()
+				}
+				r.result <- screenCache.cache
+				screenCache.mu.Unlock()
 			case "heartbeat":
 				cell.SendMessage(0x50, "")
 				r.result <- cell.GetMessage()
@@ -77,9 +94,8 @@ func main() {
 		request_channel <- request_object
 
 		//For supporting AJAX sending JPEG, must encoding data through base64
-		encoder := base64.NewEncoder(base64.StdEncoding, w)
-		encoder.Write(<-request_object.result)
-		encoder.Close()
+		//encoder := base64.NewEncoder(base64.StdEncoding, w)
+		w.Write(<-request_object.result)
 	})
 	http.HandleFunc("/touch", func(w http.ResponseWriter, req *http.Request) {
 		query := req.URL.Query()
@@ -122,8 +138,3 @@ func main() {
 	http.Handle("/static/", http.StripPrefix("/static/", fs))
 	log.Fatal(http.ListenAndServe(*httpAddr, nil))
 }
-
-var (
-	mu   = sync.Mutex{}
-	tmpl = template.Must(template.ParseFiles("template.html"))
-)

@@ -12,10 +12,10 @@ var ScreenAjaxRequest = function (uri) {
 		}).fail(function(){
 			alert("Connection failed, Try again")
 		}).done(function(data){
-			if (data.length > 0) {
-                img.prop("src", "data:image/jpeg;base64, " + data)
+			if (data != null && data.length > 0) {
+                $(img).attr("src", "/screen?date="+new Date().getTime());
 			}
-			ScreenAjaxRequest(uri);
+			setTimeout(ScreenAjaxRequest,500,uri);
 		});
 	});
 };
