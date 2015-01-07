@@ -52,13 +52,15 @@ func Poller(in <-chan *Request, cell *cell.CellAdvisor, thread_number int) {
 				cell.SendSCPI(scpicmd)
 				r.result <- []byte("")
 			case "screen":
-				screenCache.mu.Lock()
-				if time.Now().Sub(screenCache.last).Seconds() > 1 {
-					screenCache.last = time.Now()
-					screenCache.cache = cell.GetScreen()
-				}
-				r.result <- screenCache.cache
-				screenCache.mu.Unlock()
+				go func() {
+					screenCache.mu.Lock()
+					defer screenCache.mu.Unlock()
+					if time.Now().Sub(screenCache.last).Seconds() > 1 {
+						screenCache.last = time.Now()
+						screenCache.cache = cell.GetScreen()
+					}
+					r.result <- screenCache.cache
+				}()
 			case "heartbeat":
 				cell.SendMessage(0x50, "")
 				r.result <- cell.GetMessage()
@@ -94,7 +96,6 @@ func main() {
 		request_channel <- request_object
 
 		//For supporting AJAX sending JPEG, must encoding data through base64
-		//encoder := base64.NewEncoder(base64.StdEncoding, w)
 		w.Write(<-request_object.result)
 	})
 	http.HandleFunc("/touch", func(w http.ResponseWriter, req *http.Request) {
