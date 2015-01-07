@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"flag"
 	"fmt"
 	"log"
@@ -25,10 +26,11 @@ type Request struct {
 	result  chan []byte
 }
 
-func Poller(in <-chan *Request, cell *cell.CellAdvisor) {
+func Poller(in <-chan *Request, cell *cell.CellAdvisor, thread_number int) {
 	for {
 		select {
 		case r := <-in:
+			log.Println("Thread ", thread_number, ":", r.command)
 			switch r.command {
 			case "keyp":
 				scpicmd := fmt.Sprintf("KEYP:%s", r.args["value"])
@@ -45,8 +47,10 @@ func Poller(in <-chan *Request, cell *cell.CellAdvisor) {
 				r.result <- cell.GetMessage()
 			}
 		case <-time.After(time.Second * 20):
+			mu.Lock()
 			cell.SendMessage(0x50, "")
-			log.Println("Hearbeat:", string(cell.GetMessage()))
+			log.Println("Hearbeat:", thread_number, string(cell.GetMessage()))
+			mu.Unlock()
 		}
 	}
 }
@@ -57,19 +61,25 @@ func NewRequest(command string, args map[string]string) *Request {
 
 func main() {
 	flag.Parse()
-	cell_list := []cell.CellAdvisor{cell.NewCellAdvisor(*cellAdvisorAddr), cell.NewCellAdvisor(*cellAdvisorAddr)}
+	cell_list := []cell.CellAdvisor{cell.NewCellAdvisor(*cellAdvisorAddr),
+		cell.NewCellAdvisor(*cellAdvisorAddr),
+		cell.NewCellAdvisor(*cellAdvisorAddr)}
 	//cell := cell.NewCellAdvisor(*cellAdvisorAddr)
 
 	request_channel := make(chan *Request, 20)
 	for i, _ := range cell_list {
-		go Poller(request_channel, &cell_list[i])
+		go Poller(request_channel, &cell_list[i], i)
 	}
 
 	http.HandleFunc("/screen", func(w http.ResponseWriter, req *http.Request) {
 		w.Header().Set("Content-Type", "image/jpeg")
 		request_object := NewRequest("screen", nil)
 		request_channel <- request_object
-		w.Write(<-request_object.result)
+
+		//For supporting AJAX sending JPEG, must encoding data through base64
+		encoder := base64.NewEncoder(base64.StdEncoding, w)
+		encoder.Write(<-request_object.result)
+		encoder.Close()
 	})
 	http.HandleFunc("/touch", func(w http.ResponseWriter, req *http.Request) {
 		query := req.URL.Query()
@@ -114,6 +124,6 @@ func main() {
 }
 
 var (
+	mu   = sync.Mutex{}
 	tmpl = template.Must(template.ParseFiles("template.html"))
-	mu   = sync.RWMutex{}
 )

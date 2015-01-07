@@ -2,8 +2,14 @@ package cell
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
+	"image"
+	"image/jpeg"
+	"log"
 	"net"
+
+	"github.com/nfnt/resize"
 )
 
 // CellAdvisor represents connection status with JDSU CellAdvisor devices
@@ -80,7 +86,16 @@ func (cl *CellAdvisor) initCellAdvisor() {
 
 func (cl CellAdvisor) GetScreen() []byte {
 	cl.SendMessage(0x60, "")
-	return cl.GetMessage()
+	result := new(bytes.Buffer)
+	data := cl.GetMessage()
+	img, _, err := image.Decode(bytes.NewReader(data))
+	if err != nil {
+		log.Println("JPEG Error:", err)
+		return nil
+	}
+	m := resize.Resize(600, 0, img, resize.Lanczos3)
+	jpeg.Encode(result, m, &jpeg.Options{jpeg.DefaultQuality - 50})
+	return result.Bytes()
 }
 
 // SendSCPI sends SCPI commands to CellAdvisor devices

@@ -3,18 +3,33 @@
 <head>
 <script src="/static/1.11.1/jquery.min.js"></script>
 <script>
-setInterval(function(){
+
+var ScreenAjaxRequest = function (uri) {
 	$(".cell").each(function(i){
-		$(this).attr("src", "/screen?date="+new Date().getTime());
+		img = $(this)
+		$.ajax({
+			url: uri
+		}).fail(function(){
+			alert("Connection failed, Try again")
+		}).done(function(data){
+			if (data.length > 0) {
+                img.prop("src", "data:image/jpeg;base64, " + data)
+			}
+			ScreenAjaxRequest(uri);
+		});
 	});
-},500);
+};
+
+
 
 $(document).ready(function() {
 	  $(".cell").each(function(i){
 		 $(this).click(function(e) {
 			var offset = $(this).offset();
-			x= e.clientX - offset.left
-			y= e.clientY - offset.top
+			x= e.pageX - offset.left
+			y= e.pageY - offset.top
+			x= parseInt(x*1.33)
+			y= parseInt(y*1.33)
 			 $.get("/touch?x="+x+"&y="+y,
 			 function(data,status){
 				console.log("Status: " + status);
@@ -33,6 +48,8 @@ $(document).ready(function() {
 			});
 		});
 	 });
+	 
+	 ScreenAjaxRequest ("/screen");
 });
 
 
@@ -52,7 +69,7 @@ $(document).ready(function() {
 	<table class="tg">
 	  <tr>
 		<th class="tg-031e" colspan="6" rowspan="9" style="padding-bottom:0px; padding-top:0px">
-		<img class="cell" width="800" height="600"/>
+		<img class="cell" width="600" height="450"/>
 		</th>
 		<th class="tg-031e"><button class="keyp" value="ESC">ESC</button></th>
 	  </tr>
