@@ -1,6 +1,7 @@
 package main
 
 import (
+	"expvar"
 	"flag"
 	"fmt"
 	"log"
@@ -25,6 +26,13 @@ var (
 	tmpl        = template.Must(template.ParseFiles("template.html"))
 )
 
+var (
+	sendSuccessCount    = expvar.NewInt("sendSuccessCount")
+	receiveSucessCount  = expvar.NewInt("receiveSucessCount")
+	sendPendingCount    = expvar.NewInt("sendPendingCount")
+	receivePendingCount = expvar.NewInt("receivePendingCount")
+)
+
 type Request struct {
 	command string
 	args    map[string]string
@@ -37,38 +45,51 @@ type ScreenCache struct {
 	mu    sync.RWMutex
 }
 
-func Poller(in <-chan *Request, cell *cell.CellAdvisor, thread_number int) {
+func Poller(done <-chan struct{}, in <-chan *Request, cell *cell.CellAdvisor, thread_number int) {
+	var err error
 	for {
 		select {
+		case <-done:
+			log.Println("Cancellation signal received")
+			return
 		case r := <-in:
 			log.Println("Thread ", thread_number, ":", r.command)
 			switch r.command {
 			case "keyp":
 				scpicmd := fmt.Sprintf("KEYP:%s", r.args["value"])
 				cell.SendSCPI(scpicmd)
-				r.result <- []byte("")
+				sendResult(done, r.result, []byte{})
 			case "touch":
 				scpicmd := fmt.Sprintf("KEYP %s %s", r.args["x"], r.args["y"])
 				cell.SendSCPI(scpicmd)
-				r.result <- []byte("")
+				sendResult(done, r.result, []byte{})
 			case "screen":
 				go func() {
 					screenCache.mu.Lock()
 					defer screenCache.mu.Unlock()
 					if time.Now().Sub(screenCache.last).Seconds() > 1 {
 						screenCache.last = time.Now()
-						screenCache.cache = cell.GetScreen()
+						screenCache.cache, err = cell.GetScreen()
+						if err != nil {
+							log.Println(err.Error())
+						}
 					}
-					r.result <- screenCache.cache
+					sendResult(done, r.result, screenCache.cache)
 				}()
 			case "heartbeat":
-				cell.SendMessage(0x50, "")
-				r.result <- cell.GetMessage()
+				msg, err := cell.GetStatusMessage()
+				if err != nil {
+					log.Println(err.Error())
+				}
+				sendResult(done, r.result, msg)
 			}
-		case <-time.After(time.Second * 20):
+		case <-time.After(time.Second * 15):
 			mu.Lock()
-			cell.SendMessage(0x50, "")
-			log.Println("Hearbeat:", thread_number, string(cell.GetMessage()))
+			msg, err := cell.GetStatusMessage()
+			if err != nil {
+				log.Println(err.Error())
+			}
+			log.Println("Hearbeat:", thread_number, string(msg))
 			mu.Unlock()
 		}
 	}
@@ -78,7 +99,35 @@ func NewRequest(command string, args map[string]string) *Request {
 	return &Request{command, args, make(chan []byte, 1)}
 }
 
+func sendResult(done <-chan struct{}, pipe chan<- []byte, result []byte) {
+	select {
+	case pipe <- result:
+		sendSuccessCount.Add(1)
+	case <-time.After(time.Second * 3):
+		log.Println("Sending Timeout")
+		sendPendingCount.Add(1)
+	case <-done:
+		return
+	}
+}
+func receiveResult(done <-chan struct{}, pipe <-chan []byte) []byte {
+	select {
+	case result := <-pipe:
+		receiveSucessCount.Add(1)
+		return result
+	case <-time.After(time.Second * 3):
+		log.Println("Receive Timeout")
+		receivePendingCount.Add(1)
+	case <-done:
+	}
+	return []byte{}
+}
+
 func main() {
+
+	done := make(chan struct{})
+	defer close(done)
+
 	flag.Parse()
 	cell_list := []cell.CellAdvisor{cell.NewCellAdvisor(*cellAdvisorAddr),
 		cell.NewCellAdvisor(*cellAdvisorAddr),
@@ -87,7 +136,7 @@ func main() {
 
 	request_channel := make(chan *Request, 20)
 	for i, _ := range cell_list {
-		go Poller(request_channel, &cell_list[i], i)
+		go Poller(done, request_channel, &cell_list[i], i)
 	}
 
 	http.HandleFunc("/screen", func(w http.ResponseWriter, req *http.Request) {
@@ -95,8 +144,7 @@ func main() {
 		request_object := NewRequest("screen", nil)
 		request_channel <- request_object
 
-		//For supporting AJAX sending JPEG, must encoding data through base64
-		w.Write(<-request_object.result)
+		w.Write(receiveResult(done, request_object.result))
 	})
 	http.HandleFunc("/touch", func(w http.ResponseWriter, req *http.Request) {
 		query := req.URL.Query()
@@ -104,7 +152,7 @@ func main() {
 		if x != "" && y != "" {
 			request_object := NewRequest("touch", map[string]string{"x": x, "y": y})
 			request_channel <- request_object
-			w.Write(<-request_object.result)
+			w.Write(receiveResult(done, request_object.result))
 		} else {
 			fmt.Fprintf(w, "Coordination not given")
 			w.WriteHeader(http.StatusBadRequest)
@@ -122,7 +170,7 @@ func main() {
 		if value != "" {
 			request_object := NewRequest("keyp", map[string]string{"value": value})
 			request_channel <- request_object
-			w.Write(<-request_object.result)
+			w.Write(receiveResult(done, request_object.result))
 
 		} else {
 			fmt.Fprintf(w, "Keypad name not given")

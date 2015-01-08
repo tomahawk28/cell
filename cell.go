@@ -29,7 +29,7 @@ func (cl CellAdvisor) SendMessage(cmd byte, data string) {
 	cl.writer.Flush()
 }
 
-func (cl CellAdvisor) GetMessage() []byte {
+func (cl CellAdvisor) GetMessage() ([]byte, error) {
 
 	isMarked := false
 	result, bufResult := []byte{}, []byte{}
@@ -37,7 +37,7 @@ func (cl CellAdvisor) GetMessage() []byte {
 	for messageContinue {
 		ret, err := cl.reader.ReadBytes(0x7e)
 		if err != nil {
-			panic(err)
+			return nil, err
 		}
 		//delete subsequent checksum if its marked
 		if ret[len(ret)-2] == '}' {
@@ -65,7 +65,7 @@ buffer_loop:
 		}
 		result = append(result, byte(value))
 	}
-	return result
+	return result, nil
 }
 
 func (cl *CellAdvisor) initCellAdvisor() {
@@ -78,8 +78,13 @@ func (cl *CellAdvisor) initCellAdvisor() {
 	cl.reader, cl.writer = bufio.NewReader(conn), bufio.NewWriter(conn)
 }
 
-func (cl CellAdvisor) GetScreen() []byte {
+func (cl CellAdvisor) GetScreen() ([]byte, error) {
 	cl.SendMessage(0x60, "")
+	return cl.GetMessage()
+}
+
+func (cl CellAdvisor) GetStatusMessage() ([]byte, error) {
+	cl.SendMessage(0x50, "")
 	return cl.GetMessage()
 }
 
