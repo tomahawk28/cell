@@ -134,7 +134,7 @@ func main() {
 		cell.NewCellAdvisor(*cellAdvisorAddr)}
 	//cell := cell.NewCellAdvisor(*cellAdvisorAddr)
 
-	request_channel := make(chan *Request, 20)
+	request_channel := make(chan *Request, len(cell_list))
 	for i, _ := range cell_list {
 		go Poller(done, request_channel, &cell_list[i], i)
 	}
