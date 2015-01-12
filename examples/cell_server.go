@@ -38,6 +38,7 @@ import (
 var (
 	httpAddr        = flag.String("http", ":8040", "Listen Address")
 	cellAdvisorAddr = flag.String("celladdr", "10.82.26.12", "CellAdvisor Address")
+	numsport        = flag.Uint("numsport", 4, "The number of ports ")
 	pollPeriod      = flag.Duration("poll", 30*time.Second, "Poll Period")
 )
 
@@ -66,23 +67,22 @@ type ScreenCache struct {
 	mu    sync.RWMutex
 }
 
-func Poller(done <-chan struct{}, in <-chan *Request, cell *cell.CellAdvisor, thread_number int) {
+func Poller(in <-chan *Request, cell *cell.CellAdvisor, thread_number int) {
+	done := make(chan struct{})
+	defer close(done)
 	var err error
 	for {
 		select {
-		case <-done:
-			log.Println("Cancellation signal received")
-			return
 		case r := <-in:
 			log.Println("Thread ", thread_number, ":", r.command)
 			switch r.command {
 			case "keyp":
 				scpicmd := fmt.Sprintf("KEYP:%s", r.args["value"])
-				cell.SendSCPI(scpicmd)
+				_, err = cell.SendSCPI(scpicmd)
 				sendResult(done, r.result, []byte{})
 			case "touch":
 				scpicmd := fmt.Sprintf("KEYP %s %s", r.args["x"], r.args["y"])
-				cell.SendSCPI(scpicmd)
+				_, err = cell.SendSCPI(scpicmd)
 				sendResult(done, r.result, []byte{})
 			case "screen":
 				go func() {
@@ -113,6 +113,11 @@ func Poller(done <-chan struct{}, in <-chan *Request, cell *cell.CellAdvisor, th
 			log.Println("Hearbeat:", thread_number, string(msg))
 			mu.Unlock()
 		}
+		//Check Error Status == EOF
+
+		if err != nil && err.Error() == "EOF" {
+			return
+		}
 	}
 }
 
@@ -131,7 +136,7 @@ func sendResult(done <-chan struct{}, pipe chan<- []byte, result []byte) {
 		return
 	}
 }
-func receiveResult(done <-chan struct{}, pipe <-chan []byte) []byte {
+func receiveResult(pipe <-chan []byte) []byte {
 	select {
 	case result := <-pipe:
 		receiveSucessCount.Add(1)
@@ -139,26 +144,23 @@ func receiveResult(done <-chan struct{}, pipe <-chan []byte) []byte {
 	case <-time.After(time.Second * 5):
 		log.Println("Receive Timeout")
 		receivePendingCount.Add(1)
-	case <-done:
 	}
 	return []byte{}
 }
 
 func main() {
 
-	done := make(chan struct{})
-	defer close(done)
-
 	flag.Parse()
 	// 4 Ports ready for work
-	cell_list := []cell.CellAdvisor{cell.NewCellAdvisor(*cellAdvisorAddr),
-		cell.NewCellAdvisor(*cellAdvisorAddr),
-		cell.NewCellAdvisor(*cellAdvisorAddr),
-		cell.NewCellAdvisor(*cellAdvisorAddr)}
+	cell_list := make([]cell.CellAdvisor, *numsport)
+
+	for i, _ := range cell_list {
+		cell_list[i] = cell.NewCellAdvisor(*cellAdvisorAddr)
+	}
 
 	request_channel := make(chan *Request, len(cell_list))
 	for i, _ := range cell_list {
-		go Poller(done, request_channel, &cell_list[i], i)
+		go Poller(request_channel, &cell_list[i], i)
 	}
 
 	http.HandleFunc("/screen", func(w http.ResponseWriter, req *http.Request) {
@@ -166,7 +168,7 @@ func main() {
 		request_object := NewRequest("screen", nil)
 		request_channel <- request_object
 
-		w.Write(receiveResult(done, request_object.result))
+		w.Write(receiveResult(request_object.result))
 	})
 	http.HandleFunc("/touch", func(w http.ResponseWriter, req *http.Request) {
 		query := req.URL.Query()
@@ -174,7 +176,7 @@ func main() {
 		if x != "" && y != "" {
 			request_object := NewRequest("touch", map[string]string{"x": x, "y": y})
 			request_channel <- request_object
-			w.Write(receiveResult(done, request_object.result))
+			w.Write(receiveResult(request_object.result))
 		} else {
 			fmt.Fprintf(w, "Coordination not given")
 			w.WriteHeader(http.StatusBadRequest)
@@ -192,7 +194,7 @@ func main() {
 		if value != "" {
 			request_object := NewRequest("keyp", map[string]string{"value": value})
 			request_channel <- request_object
-			w.Write(receiveResult(done, request_object.result))
+			w.Write(receiveResult(request_object.result))
 
 		} else {
 			fmt.Fprintf(w, "Keypad name not given")

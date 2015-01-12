@@ -36,7 +36,7 @@ type CellAdvisor struct {
 }
 
 // SendMessage could send single cmd byte, and data strings
-func (cl CellAdvisor) SendMessage(cmd byte, data string) {
+func (cl CellAdvisor) SendMessage(cmd byte, data string) (int, error) {
 
 	sendingMsg := ""
 	sendingMsg = string([]byte{0x7f, 'C', cmd, 0x01, 0x01})
@@ -46,8 +46,12 @@ func (cl CellAdvisor) SendMessage(cmd byte, data string) {
 	sendingMsg += string(cl.getChecksum(sendingMsg[1:]))
 	sendingMsg += string([]byte{0x7e})
 
-	fmt.Fprintf(cl.writer, string(sendingMsg))
+	num, err := fmt.Fprintf(cl.writer, string(sendingMsg))
+	if err != nil {
+		return 0, err
+	}
 	cl.writer.Flush()
+	return num, err
 }
 
 func (cl CellAdvisor) GetMessage() ([]byte, error) {
@@ -111,8 +115,8 @@ func (cl CellAdvisor) GetStatusMessage() ([]byte, error) {
 
 // SendSCPI sends SCPI commands to CellAdvisor devices
 // (http://en.wikipedia.org/wiki/Standard_Commands_for_Programmable_Instruments)
-func (cl CellAdvisor) SendSCPI(scpicmd string) {
-	cl.SendMessage(0x61, scpicmd+"\n")
+func (cl CellAdvisor) SendSCPI(scpicmd string) (int, error) {
+	return cl.SendMessage(0x61, scpicmd+"\n")
 }
 
 func (cl CellAdvisor) getChecksum(data string) []byte {
