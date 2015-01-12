@@ -150,10 +150,11 @@ func main() {
 	defer close(done)
 
 	flag.Parse()
+	// 4 Ports ready for work
 	cell_list := []cell.CellAdvisor{cell.NewCellAdvisor(*cellAdvisorAddr),
 		cell.NewCellAdvisor(*cellAdvisorAddr),
+		cell.NewCellAdvisor(*cellAdvisorAddr),
 		cell.NewCellAdvisor(*cellAdvisorAddr)}
-	//cell := cell.NewCellAdvisor(*cellAdvisorAddr)
 
 	request_channel := make(chan *Request, len(cell_list))
 	for i, _ := range cell_list {
