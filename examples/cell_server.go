@@ -124,7 +124,7 @@ func sendResult(done <-chan struct{}, pipe chan<- []byte, result []byte) {
 	select {
 	case pipe <- result:
 		sendSuccessCount.Add(1)
-	case <-time.After(time.Second * 3):
+	case <-time.After(time.Second * 2):
 		log.Println("Sending Timeout")
 		sendPendingCount.Add(1)
 	case <-done:
@@ -136,7 +136,7 @@ func receiveResult(done <-chan struct{}, pipe <-chan []byte) []byte {
 	case result := <-pipe:
 		receiveSucessCount.Add(1)
 		return result
-	case <-time.After(time.Second * 3):
+	case <-time.After(time.Second * 5):
 		log.Println("Receive Timeout")
 		receivePendingCount.Add(1)
 	case <-done:
