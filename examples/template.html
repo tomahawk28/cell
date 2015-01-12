@@ -4,18 +4,27 @@
 <script src="/static/1.11.1/jquery.min.js"></script>
 <script>
 
+var retryMills = 500
+
 var ScreenAjaxRequest = function (uri) {
 	$(".cell").each(function(i){
 		img = $(this)
 		$.ajax({
-			url: uri
-		}).fail(function(){
-			alert("Connection failed, Try again")
+			url: uri,
+			timeout: 3000
+		}).fail(function(jqXHR, textStatus, errorThrown){
+			if(textStatus=="timeout"){
+				$("#info").html("Poor network connection")
+				setTimeout(ScreenAjaxRequest,retryMills*1.5,uri);
+			}else{
+				alert("Connection failed, Try again:")
+			}
 		}).done(function(data){
 			if (data != null && data.length > 0) {
+				$("#info").html("")
                 $(img).attr("src", "/screen?date="+new Date().getTime());
 			}
-			setTimeout(ScreenAjaxRequest,500,uri);
+			setTimeout(ScreenAjaxRequest,retryMills,uri);
 		});
 	});
 };
@@ -64,6 +73,7 @@ $(document).ready(function() {
 	.tg th{font-family:Arial, sans-serif;font-size:14px;font-weight:normal;padding:10px 5px;border-style:solid;border-width:1px;overflow:hidden;word-break:normal;}
 	.keyp {width: 80px;border-width: 2;}
 	</style>
+	<div id="info" class="info-box alert"></div>
 	<table>
 	<tr><td>
 	<table class="tg">
