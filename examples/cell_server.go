@@ -39,7 +39,7 @@ var (
 	httpAddr        = flag.String("http", ":8040", "Listen Address")
 	cellAdvisorAddr = flag.String("celladdr", "10.82.26.12", "CellAdvisor Address")
 	numsport        = flag.Uint("numsport", 4, "The number of ports ")
-	pollPeriod      = flag.Duration("poll", 30*time.Second, "Poll Period")
+	pollPeriod      = flag.Duration("poll", 10*time.Second, "Poll Period")
 )
 
 var (
@@ -71,6 +71,7 @@ func Poller(in <-chan *Request, cell *cell.CellAdvisor, thread_number int) {
 	done := make(chan struct{})
 	defer close(done)
 	var err error
+	var msg []byte
 	for {
 		select {
 		case r := <-in:
@@ -98,15 +99,15 @@ func Poller(in <-chan *Request, cell *cell.CellAdvisor, thread_number int) {
 					sendResult(done, r.result, screenCache.cache)
 				}()
 			case "heartbeat":
-				msg, err := cell.GetStatusMessage()
+				msg, err = cell.GetStatusMessage()
 				if err != nil {
 					log.Println(err.Error())
 				}
 				sendResult(done, r.result, msg)
 			}
-		case <-time.After(time.Second * 15):
+		case <-time.After(*pollPeriod):
 			mu.Lock()
-			msg, err := cell.GetStatusMessage()
+			msg, err = cell.GetStatusMessage()
 			if err != nil {
 				log.Println(err.Error())
 			}
