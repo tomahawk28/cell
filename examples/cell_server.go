@@ -96,28 +96,28 @@ func Poller(in <-chan *Request, cell *cell.CellAdvisor, thread_number int) {
 							log.Println(err.Error())
 						}
 					}
+
 					sendResult(done, r.result, screenCache.cache)
 				}()
 			case "heartbeat":
 				msg, err = cell.GetStatusMessage()
-				if err != nil {
-					log.Println(err.Error())
-				}
 				sendResult(done, r.result, msg)
 			}
 		case <-time.After(*pollPeriod):
 			mu.Lock()
 			msg, err = cell.GetStatusMessage()
-			if err != nil {
-				log.Println(err.Error())
-			}
 			log.Println("Hearbeat:", thread_number, string(msg))
 			mu.Unlock()
 		}
 		//Check Error Status == EOF
-
-		if err != nil && err.Error() == "EOF" {
-			return
+		if err != nil {
+			switch err.Error() {
+			case "EOF":
+				log.Println("Connection loses on ", thread_number, ", Poller exited")
+				return
+			default:
+				log.Println(err.Error())
+			}
 		}
 	}
 }

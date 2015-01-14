@@ -48,9 +48,12 @@ func (cl CellAdvisor) SendMessage(cmd byte, data string) (int, error) {
 
 	num, err := fmt.Fprintf(cl.writer, string(sendingMsg))
 	if err != nil {
-		return 0, err
+		return num, err
 	}
-	cl.writer.Flush()
+	err = cl.writer.Flush()
+	if err != nil {
+		return num, err
+	}
 	return num, err
 }
 
