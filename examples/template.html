@@ -11,7 +11,7 @@ var ScreenAjaxRequest = function (uri) {
 		img = $(this)
 		$.ajax({
 			url: uri,
-			timeout: 3000
+			timeout: 8000
 		}).fail(function(jqXHR, textStatus, errorThrown){
 			if(textStatus=="timeout"){
 				$("#info").html("Poor network connection")
@@ -58,7 +58,7 @@ $(document).ready(function() {
 		});
 	 });
 	 
-	 ScreenAjaxRequest ("/screen");
+	 ScreenAjaxRequest ("/refresh_screen");
 });
 
 

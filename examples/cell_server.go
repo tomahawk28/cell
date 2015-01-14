@@ -86,19 +86,24 @@ func Poller(in <-chan *Request, cell *cell.CellAdvisor, thread_number int) {
 				_, err = cell.SendSCPI(scpicmd)
 				sendResult(done, r.result, []byte{})
 			case "screen":
+				screenCache.mu.RLock()
+				sendResult(done, r.result, screenCache.cache)
+				screenCache.mu.RUnlock()
+			case "refresh_screen":
 				go func() {
-					screenCache.mu.Lock()
-					defer screenCache.mu.Unlock()
 					if time.Now().Sub(screenCache.last).Seconds() > 1 {
-						screenCache.last = time.Now()
-						screenCache.cache, err = cell.GetScreen()
-						if err != nil {
-							log.Println(err.Error())
+						screenCache.mu.Lock()
+						defer screenCache.mu.Unlock()
+						if time.Now().Sub(screenCache.last).Seconds() > 1 {
+							screenCache.last = time.Now()
+							screenCache.cache, err = cell.GetScreen()
+							if err != nil {
+								log.Println(err.Error())
+							}
 						}
 					}
-
-					sendResult(done, r.result, screenCache.cache)
 				}()
+				sendResult(done, r.result, []byte("OK"))
 			case "heartbeat":
 				msg, err = cell.GetStatusMessage()
 				sendResult(done, r.result, msg)
@@ -164,6 +169,12 @@ func main() {
 		go Poller(request_channel, &cell_list[i], i)
 	}
 
+	http.HandleFunc("/refresh_screen", func(w http.ResponseWriter, req *http.Request) {
+		request_object := NewRequest("refresh_screen", nil)
+		request_channel <- request_object
+
+		w.Write(receiveResult(request_object.result))
+	})
 	http.HandleFunc("/screen", func(w http.ResponseWriter, req *http.Request) {
 		w.Header().Set("Content-Type", "image/jpeg")
 		request_object := NewRequest("screen", nil)
