@@ -5,6 +5,23 @@
 <script>
 
 var retryMills = 500
+var loadCompleted = false
+
+function checkLoadStatus(retry, uri){
+    if (loadCompleted){
+        loadCompleted=false
+        setTimeout(ScreenAjaxRequest,retryMills, uri);
+    }else if (retry>0){
+       setTimeout(checkLoadStatus, 400, retry-1, uri) 
+    }else{
+        //retry dried out
+        alert("Check your network connection!")
+    }
+}
+
+function completeStatus(){
+    loadCompleted = true
+}
 
 var ScreenAjaxRequest = function (uri) {
 	$(".cell").each(function(i){
@@ -24,10 +41,12 @@ var ScreenAjaxRequest = function (uri) {
 				$("#info").html("")
                 $(img).attr("src", "/screen?date="+new Date().getTime());
 			}
-			setTimeout(ScreenAjaxRequest,retryMills,uri);
+            checkLoadStatus(10,uri)
 		});
 	});
 };
+
+
 
 
 
@@ -79,7 +98,7 @@ $(document).ready(function() {
 	<table class="tg">
 	  <tr>
 		<th class="tg-031e" colspan="6" rowspan="9" style="padding-bottom:0px; padding-top:0px">
-		<img class="cell" width="600" height="450"/>
+		<img class="cell" width="600" height="450" onload="completeStatus()"/>
 		</th>
 		<th class="tg-031e"><button class="keyp" value="ESC">ESC</button></th>
 	  </tr>
