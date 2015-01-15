@@ -16,12 +16,12 @@ function checkLoadStatus(retry){
        setTimeout(function() {
                 checkLoadStatus(retry-1);
                 }, 400);
-       if(typeof(console)){
+       if(typeof(console)!=undefined){
            console.log("image load waiting: " + retry )
        }
     }else{
         //retry dried out
-       if(typeof(console)){
+       if(typeof(console)!=undefined){
         console.log("image load faild: " + retry )
        }
         alert("Check your network connection!")
@@ -70,7 +70,7 @@ $(document).ready(function() {
 			y= parseInt(y*1.33)
 			 $.get("/touch?x="+x+"&y="+y,
 			 function(data,status){
-             if(typeof(console)){
+             if(typeof(console)!=undefined){
                  console.log("Status: " + status);
              }
 			});

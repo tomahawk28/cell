@@ -43,7 +43,7 @@ var (
 )
 
 var (
-	screenCache = ScreenCache{time.Now(), []byte{}, sync.RWMutex{}}
+	screenCache = pollScreenCache{time.Now(), []byte{}, sync.RWMutex{}}
 	mu          = sync.Mutex{}
 	tmpl        = template.Must(template.ParseFiles("template.html"))
 )
@@ -55,19 +55,19 @@ var (
 	receivePendingCount = expvar.NewInt("receivePendingCount")
 )
 
-type Request struct {
+type pollRequest struct {
 	command string
 	args    map[string]string
 	result  chan []byte
 }
 
-type ScreenCache struct {
+type pollScreenCache struct {
 	last  time.Time
 	cache []byte
 	mu    sync.RWMutex
 }
 
-func Poller(in <-chan *Request, cell *cell.CellAdvisor, thread_number int) {
+func poller(in <-chan *pollRequest, cell *cell.CellAdvisor, threadNumber int) {
 	done := make(chan struct{})
 	defer close(done)
 	var err error
@@ -75,7 +75,7 @@ func Poller(in <-chan *Request, cell *cell.CellAdvisor, thread_number int) {
 	for {
 		select {
 		case r := <-in:
-			log.Println("Thread ", thread_number, ":", r.command)
+			log.Println("Thread ", threadNumber, ":", r.command)
 			switch r.command {
 			case "keyp":
 				scpicmd := fmt.Sprintf("KEYP:%s", r.args["value"])
@@ -111,14 +111,14 @@ func Poller(in <-chan *Request, cell *cell.CellAdvisor, thread_number int) {
 		case <-time.After(*pollPeriod):
 			mu.Lock()
 			msg, err = cell.GetStatusMessage()
-			log.Println("Hearbeat:", thread_number, string(msg))
+			log.Println("Hearbeat:", threadNumber, string(msg))
 			mu.Unlock()
 		}
 		//Check Error Status == EOF
 		if err != nil {
 			switch err.Error() {
 			case "EOF":
-				log.Println("Connection loses on ", thread_number, ", Poller exited")
+				log.Println("Connection loses on ", threadNumber, ", Poller exited")
 				return
 			default:
 				log.Println(err.Error())
@@ -127,8 +127,8 @@ func Poller(in <-chan *Request, cell *cell.CellAdvisor, thread_number int) {
 	}
 }
 
-func NewRequest(command string, args map[string]string) *Request {
-	return &Request{command, args, make(chan []byte)}
+func NewRequest(command string, args map[string]string) *pollRequest {
+	return &pollRequest{command, args, make(chan []byte)}
 }
 
 func sendResult(done <-chan struct{}, pipe chan<- []byte, result []byte) {
@@ -157,38 +157,35 @@ func receiveResult(pipe <-chan []byte) []byte {
 func main() {
 
 	flag.Parse()
-	// 4 Ports ready for work
-	cell_list := make([]cell.CellAdvisor, *numsport)
 
-	for i, _ := range cell_list {
-		cell_list[i] = cell.NewCellAdvisor(*cellAdvisorAddr)
-	}
+	cellList := make([]cell.CellAdvisor, *numsport)
+	requestChannel := make(chan *pollRequest, len(cellList))
 
-	request_channel := make(chan *Request, len(cell_list))
-	for i, _ := range cell_list {
-		go Poller(request_channel, &cell_list[i], i)
+	for i := range cellList {
+		cellList[i] = cell.NewCellAdvisor(*cellAdvisorAddr)
+		go poller(requestChannel, &cellList[i], i)
 	}
 
 	http.HandleFunc("/refresh_screen", func(w http.ResponseWriter, req *http.Request) {
-		request_object := NewRequest("refresh_screen", nil)
-		request_channel <- request_object
+		requestObject := NewRequest("refresh_screen", nil)
+		requestChannel <- requestObject
 
-		w.Write(receiveResult(request_object.result))
+		w.Write(receiveResult(requestObject.result))
 	})
 	http.HandleFunc("/screen", func(w http.ResponseWriter, req *http.Request) {
 		w.Header().Set("Content-Type", "image/jpeg")
-		request_object := NewRequest("screen", nil)
-		request_channel <- request_object
+		requestObject := NewRequest("screen", nil)
+		requestChannel <- requestObject
 
-		w.Write(receiveResult(request_object.result))
+		w.Write(receiveResult(requestObject.result))
 	})
 	http.HandleFunc("/touch", func(w http.ResponseWriter, req *http.Request) {
 		query := req.URL.Query()
 		x, y := query.Get("x"), query.Get("y")
 		if x != "" && y != "" {
-			request_object := NewRequest("touch", map[string]string{"x": x, "y": y})
-			request_channel <- request_object
-			w.Write(receiveResult(request_object.result))
+			requestObject := NewRequest("touch", map[string]string{"x": x, "y": y})
+			requestChannel <- requestObject
+			w.Write(receiveResult(requestObject.result))
 		} else {
 			fmt.Fprintf(w, "Coordination not given")
 			w.WriteHeader(http.StatusBadRequest)
@@ -204,9 +201,9 @@ func main() {
 		value := req.FormValue("value")
 
 		if value != "" {
-			request_object := NewRequest("keyp", map[string]string{"value": value})
-			request_channel <- request_object
-			w.Write(receiveResult(request_object.result))
+			requestObject := NewRequest("keyp", map[string]string{"value": value})
+			requestChannel <- requestObject
+			w.Write(receiveResult(requestObject.result))
 
 		} else {
 			fmt.Fprintf(w, "Keypad name not given")
