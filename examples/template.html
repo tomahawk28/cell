@@ -13,11 +13,20 @@ function checkLoadStatus(retry){
         loadCompleted=false
         setTimeout(ScreenAjaxRequest,retryMills);
     }else if (retry>0){
-       setTimeout(checkLoadStatus, 400, retry-1) 
+       setTimeout(function() {
+                checkLoadStatus(retry-1);
+                }, 400);
+       if(typeof(console)){
+           console.log("image load waiting: " + retry )
+       }
     }else{
         //retry dried out
+       if(typeof(console)){
+        console.log("image load faild: " + retry )
+       }
         alert("Check your network connection!")
     }
+    
 }
 
 function completeStatus(){
@@ -42,7 +51,7 @@ var ScreenAjaxRequest = function () {
 				$("#info").html("")
                 $(img).attr("src", "/screen?date="+new Date().getTime());
 			}
-            checkLoadStatus(20,refresh_screen_uri)
+            checkLoadStatus(40)
 		});
 	});
 };
@@ -61,7 +70,9 @@ $(document).ready(function() {
 			y= parseInt(y*1.33)
 			 $.get("/touch?x="+x+"&y="+y,
 			 function(data,status){
-				console.log("Status: " + status);
+             if(typeof(console)){
+                 console.log("Status: " + status);
+             }
 			});
 		});
 	 });
