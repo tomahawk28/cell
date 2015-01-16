@@ -6,7 +6,7 @@
 
 var retryMills = 500
 var loadCompleted = false
-var refresh_screen_uri = "/refresh_screen"
+var refresh_screen_uri = "/api/screen/refresh_screen"
 
 function checkLoadStatus(retry){
     if (loadCompleted){
@@ -38,6 +38,7 @@ var ScreenAjaxRequest = function () {
 		img = $(this)
 		$.ajax({
 			url: refresh_screen_uri,
+			type: 'POST',
 			timeout: 8000
 		}).fail(function(jqXHR, textStatus, errorThrown){
 			if(textStatus=="timeout"){
@@ -49,7 +50,7 @@ var ScreenAjaxRequest = function () {
 		}).done(function(data){
 			if (data != null && data.length > 0) {
 				$("#info").html("")
-                $(img).attr("src", "/screen?date="+new Date().getTime());
+                $(img).attr("src", "/api/screen/screen?date="+new Date().getTime());
 			}
             checkLoadStatus(40)
 		});
@@ -68,11 +69,12 @@ $(document).ready(function() {
 			y= e.pageY - offset.top
 			x= parseInt(x*1.33)
 			y= parseInt(y*1.33)
-			 $.get("/touch?x="+x+"&y="+y,
-			 function(data,status){
-             if(typeof(console)!=undefined){
-                 console.log("Status: " + status);
-             }
+			$.ajax({
+				url: "/api/scpi/touch",
+				type: 'POST',
+				data: {x: x, y: y},
+				success: function (result){
+				}
 			});
 		});
 	 });
@@ -80,7 +82,7 @@ $(document).ready(function() {
 	 $(".keyp").each(function(i){
 		 $(this).click(function(e) {
 			$.ajax({
-				url: "/keyp",
+				url: "/api/scpi/keyp",
 				type: 'POST',
 				data: {value: $(this).attr("value")},
 				success: function (result){

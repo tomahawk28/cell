@@ -22,17 +22,14 @@
 package main
 
 import (
-	"expvar"
 	"flag"
-	"fmt"
 	"log"
-	"sync"
 	"text/template"
 	"time"
 
 	"net/http"
 
-	"github.com/tomahawk28/cell"
+	"github.com/tomahawk28/cell/restful"
 )
 
 var (
@@ -43,173 +40,19 @@ var (
 )
 
 var (
-	screenCache = pollScreenCache{time.Now(), []byte{}, sync.RWMutex{}}
-	mu          = sync.Mutex{}
-	tmpl        = template.Must(template.ParseFiles("template.html"))
+	//screenCache = pollScreenCache{time.Now(), []byte{}, sync.RWMutex{}}
+	//mu          = sync.Mutex{}
+	tmpl = template.Must(template.ParseFiles("template.html"))
 )
-
-var (
-	sendSuccessCount    = expvar.NewInt("sendSuccessCount")
-	receiveSucessCount  = expvar.NewInt("receiveSucessCount")
-	sendPendingCount    = expvar.NewInt("sendPendingCount")
-	receivePendingCount = expvar.NewInt("receivePendingCount")
-)
-
-type pollRequest struct {
-	command string
-	args    map[string]string
-	result  chan []byte
-}
-
-type pollScreenCache struct {
-	last  time.Time
-	cache []byte
-	mu    sync.RWMutex
-}
-
-func poller(in <-chan *pollRequest, cell *cell.CellAdvisor, threadNumber int) {
-	done := make(chan struct{})
-	defer close(done)
-	var err error
-	var msg []byte
-	for {
-		select {
-		case r := <-in:
-			log.Println("Thread ", threadNumber, ":", r.command)
-			switch r.command {
-			case "keyp":
-				scpicmd := fmt.Sprintf("KEYP:%s", r.args["value"])
-				_, err = cell.SendSCPI(scpicmd)
-				sendResult(done, r.result, []byte{})
-			case "touch":
-				scpicmd := fmt.Sprintf("KEYP %s %s", r.args["x"], r.args["y"])
-				_, err = cell.SendSCPI(scpicmd)
-				sendResult(done, r.result, []byte{})
-			case "screen":
-				screenCache.mu.RLock()
-				sendResult(done, r.result, screenCache.cache)
-				screenCache.mu.RUnlock()
-			case "refresh_screen":
-				go func() {
-					if time.Now().Sub(screenCache.last).Seconds() > 1 {
-						screenCache.mu.Lock()
-						defer screenCache.mu.Unlock()
-						if time.Now().Sub(screenCache.last).Seconds() > 1 {
-							screenCache.last = time.Now()
-							screenCache.cache, err = cell.GetScreen()
-							if err != nil {
-								log.Println(err.Error())
-							}
-						}
-					}
-				}()
-				sendResult(done, r.result, []byte("OK"))
-			case "heartbeat":
-				msg, err = cell.GetStatusMessage()
-				sendResult(done, r.result, msg)
-			}
-		case <-time.After(*pollPeriod):
-			mu.Lock()
-			msg, err = cell.GetStatusMessage()
-			log.Println("Hearbeat:", threadNumber, string(msg))
-			mu.Unlock()
-		}
-		//Check Error Status == EOF
-		if err != nil {
-			switch err.Error() {
-			case "EOF":
-				log.Println("Connection loses on ", threadNumber, ", Poller exited")
-				return
-			default:
-				log.Println(err.Error())
-			}
-		}
-	}
-}
-
-func NewRequest(command string, args map[string]string) *pollRequest {
-	return &pollRequest{command, args, make(chan []byte)}
-}
-
-func sendResult(done <-chan struct{}, pipe chan<- []byte, result []byte) {
-	select {
-	case pipe <- result:
-		sendSuccessCount.Add(1)
-	case <-time.After(time.Second * 3):
-		log.Println("Sending Timeout")
-		sendPendingCount.Add(1)
-	case <-done:
-		return
-	}
-}
-func receiveResult(pipe <-chan []byte) []byte {
-	select {
-	case result := <-pipe:
-		receiveSucessCount.Add(1)
-		return result
-	case <-time.After(time.Second * 5):
-		log.Println("Receive Timeout")
-		receivePendingCount.Add(1)
-	}
-	return []byte{}
-}
 
 func main() {
 
 	flag.Parse()
 
-	cellList := make([]cell.CellAdvisor, *numsport)
-	requestChannel := make(chan *pollRequest, len(cellList))
+	rtr := restful.BuildCellAdvisorRestfulAPI(*numsport, *cellAdvisorAddr, *pollPeriod)
 
-	for i := range cellList {
-		cellList[i] = cell.NewCellAdvisor(*cellAdvisorAddr)
-		go poller(requestChannel, &cellList[i], i)
-	}
+	http.Handle("/api/", rtr)
 
-	http.HandleFunc("/refresh_screen", func(w http.ResponseWriter, req *http.Request) {
-		requestObject := NewRequest("refresh_screen", nil)
-		requestChannel <- requestObject
-
-		w.Write(receiveResult(requestObject.result))
-	})
-	http.HandleFunc("/screen", func(w http.ResponseWriter, req *http.Request) {
-		w.Header().Set("Content-Type", "image/jpeg")
-		requestObject := NewRequest("screen", nil)
-		requestChannel <- requestObject
-
-		w.Write(receiveResult(requestObject.result))
-	})
-	http.HandleFunc("/touch", func(w http.ResponseWriter, req *http.Request) {
-		query := req.URL.Query()
-		x, y := query.Get("x"), query.Get("y")
-		if x != "" && y != "" {
-			requestObject := NewRequest("touch", map[string]string{"x": x, "y": y})
-			requestChannel <- requestObject
-			w.Write(receiveResult(requestObject.result))
-		} else {
-			fmt.Fprintf(w, "Coordination not given")
-			w.WriteHeader(http.StatusBadRequest)
-		}
-	})
-	http.HandleFunc("/keyp", func(w http.ResponseWriter, req *http.Request) {
-		err := req.ParseForm()
-		if err != nil {
-			fmt.Fprintf(w, "Form Parse error")
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		value := req.FormValue("value")
-
-		if value != "" {
-			requestObject := NewRequest("keyp", map[string]string{"value": value})
-			requestChannel <- requestObject
-			w.Write(receiveResult(requestObject.result))
-
-		} else {
-			fmt.Fprintf(w, "Keypad name not given")
-			w.WriteHeader(http.StatusBadRequest)
-		}
-	})
 	http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
 		err := tmpl.Execute(w, nil)
 		if err != nil {
