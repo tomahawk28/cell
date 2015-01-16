@@ -40,8 +40,6 @@ var (
 )
 
 var (
-	//screenCache = pollScreenCache{time.Now(), []byte{}, sync.RWMutex{}}
-	//mu          = sync.Mutex{}
 	tmpl = template.Must(template.ParseFiles("template.html"))
 )
 
