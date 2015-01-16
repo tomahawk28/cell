@@ -27,7 +27,6 @@ import (
 	"fmt"
 	"log"
 	"sync"
-	"text/template"
 	"time"
 
 	"net/http"
@@ -35,12 +34,6 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/tomahawk28/cell"
-)
-
-var (
-	//screenCache = pollScreenCache{time.Now(), []byte{}, sync.RWMutex{}}
-	//mu          = sync.Mutex{}
-	tmpl = template.Must(template.ParseFiles("template.html"))
 )
 
 var (
@@ -167,10 +160,10 @@ func (server *cellServer) poller(cell *cell.CellAdvisor, threadNumber int) {
 				server.screenCache.mu.RUnlock()
 			case "refresh_screen":
 				go func() {
-					if time.Now().Sub(server.screenCache.last).Seconds() > 1 {
+					if len(server.screenCache.cache) == 0 || time.Now().Sub(server.screenCache.last).Seconds() > 1 {
 						server.screenCache.mu.Lock()
 						defer server.screenCache.mu.Unlock()
-						if time.Now().Sub(server.screenCache.last).Seconds() > 1 {
+						if len(server.screenCache.cache) == 0 || time.Now().Sub(server.screenCache.last).Seconds() > 1 {
 							server.screenCache.last = time.Now()
 							server.screenCache.cache, err = cell.GetScreen()
 							if err != nil {
