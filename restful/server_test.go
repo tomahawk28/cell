@@ -63,6 +63,13 @@ var (
 			argument: map[string]string{},
 			expected: "JFIF",
 		},
+		testData{
+			subject:  "unknown command : ",
+			url:      "/api/scpi/heyoman",
+			method:   "POST",
+			argument: map[string]string{},
+			expected: "unknown",
+		},
 	}
 )
 

@@ -176,6 +176,8 @@ func (server *cellServer) poller(cell *cell.CellAdvisor, threadNumber int) {
 			case "heartbeat":
 				msg, err = cell.GetStatusMessage()
 				sendResult(done, request.result, pollResult{[]byte(msg), nil})
+			default:
+				sendResult(done, request.result, pollResult{nil, errors.New("unknown command")})
 			}
 		case <-time.After(server.pollPeriod):
 			server.mu.Lock()
