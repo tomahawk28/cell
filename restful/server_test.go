@@ -100,9 +100,10 @@ func TestSCPIArgument(t *testing.T) {
 
 		w := httptest.NewRecorder()
 		rtr.ServeHTTP(w, r)
+		log.Println(w.Code)
 		if b := w.Body.String(); !strings.Contains(b, testcase.expected) {
 			t.Logf("inner testcases : %s", testcase.subject)
-			log.Println(w.HeaderMap)
+			log.Println(w.Code)
 			t.Fatalf("body = %s, want %s", b, testcase.expected)
 		}
 	}

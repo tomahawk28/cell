@@ -38,8 +38,7 @@ type CellAdvisor struct {
 // SendMessage could send single cmd byte, and data strings
 func (cl CellAdvisor) SendMessage(cmd byte, data string) (int, error) {
 
-	sendingMsg := ""
-	sendingMsg = string([]byte{0x7f, 'C', cmd, 0x01, 0x01})
+	sendingMsg := string([]byte{0x7f, 'C', cmd, 0x01, 0x01})
 	if data != "" {
 		sendingMsg += data
 	}
@@ -47,13 +46,7 @@ func (cl CellAdvisor) SendMessage(cmd byte, data string) (int, error) {
 	sendingMsg += string([]byte{0x7e})
 
 	num, err := fmt.Fprintf(cl.writer, string(sendingMsg))
-	if err != nil {
-		return num, err
-	}
 	err = cl.writer.Flush()
-	if err != nil {
-		return num, err
-	}
 	return num, err
 }
 
