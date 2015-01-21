@@ -70,24 +70,23 @@ type cellServer struct {
 	pollPeriod     time.Duration
 }
 
-func NewCellHttpServer(threadNumber uint, cellAddr string, pollPeriod time.Duration) cellServer {
+func NewCellHttpServer(threadNumber int, cellAddr string, pollPeriod time.Duration) cellServer {
 	screenCache := pollScreenCache{time.Now(), []byte{}, sync.RWMutex{}}
 	mu := sync.RWMutex{}
 
-	cellList := make([]cell.CellAdvisor, threadNumber)
-	rc := make(chan *pollRequest, len(cellList))
+	rc := make(chan *pollRequest, threadNumber)
 
 	server := cellServer{screenCache, mu, rc, pollPeriod}
 
-	for i := range cellList {
-		cellList[i] = cell.NewCellAdvisor(cellAddr)
-		go server.poller(&cellList[i], i)
+	for i := 0; i < threadNumber; i++ {
+		element := cell.NewCellAdvisor(cellAddr)
+		go server.poller(&element, i)
 	}
 
 	return server
 }
 
-func BuildCellAdvisorRestfulAPI(threadNumber uint, cellAddr string, pollPeriod time.Duration) *mux.Router {
+func BuildCellAdvisorRestfulAPI(threadNumber int, cellAddr string, pollPeriod time.Duration) *mux.Router {
 	s := NewCellHttpServer(threadNumber, cellAddr, pollPeriod)
 
 	rtr := mux.NewRouter()
@@ -104,8 +103,8 @@ func (server cellServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "POST" {
 		err := r.ParseForm()
 		if err != nil {
-			w.Write([]byte(err.Error()))
 			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(err.Error()))
 			return
 		}
 		values = r.Form
@@ -114,13 +113,13 @@ func (server cellServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	server.requestChannel <- request
 	result := receiveResult(request.result)
 	if result == nil {
-		w.Write([]byte("Poller thread respond timeout"))
 		w.WriteHeader(http.StatusServiceUnavailable)
+		w.Write([]byte("Poller thread respond timeout"))
 		return
 	}
 	if result.requestErr != nil {
-		w.Write([]byte(result.requestErr.Error()))
 		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(result.requestErr.Error()))
 		return
 	}
 
