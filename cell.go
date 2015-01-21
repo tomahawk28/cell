@@ -23,8 +23,11 @@ package cell
 
 import (
 	"bufio"
-	"fmt"
 	"net"
+)
+
+var (
+	JDProtocolPort = ":66"
 )
 
 // CellAdvisor represents connection status with JDSU CellAdvisor devices
@@ -38,14 +41,17 @@ type CellAdvisor struct {
 // SendMessage could send single cmd byte, and data strings
 func (cl CellAdvisor) SendMessage(cmd byte, data string) (int, error) {
 
-	sendingMsg := string([]byte{0x7f, 'C', cmd, 0x01, 0x01})
+	sendingMsg := []byte{'C', cmd, 0x01, 0x01}
 	if data != "" {
-		sendingMsg += data
+		sendingMsg = append(sendingMsg, []byte(data)...)
 	}
-	sendingMsg += string(cl.getChecksum(sendingMsg[1:]))
-	sendingMsg += string([]byte{0x7e})
+	//append checksum
+	sendingMsg = append(sendingMsg, getChecksum(sendingMsg))
+	sendingMsg = maskingCommandCharacter(sendingMsg)
+	sendingMsg = append(append([]byte{0x7f}, sendingMsg...), 0x7e)
 
-	num, err := fmt.Fprintf(cl.writer, string(sendingMsg))
+	num, err := cl.writer.Write(sendingMsg)
+	//num, err := fmt.Fprintf(cl.writer, string(sendingMsg))
 	err = cl.writer.Flush()
 	return num, err
 }
@@ -72,11 +78,10 @@ func (cl CellAdvisor) GetMessage() ([]byte, error) {
 		}
 	}
 
-buffer_loop:
 	for _, value := range bufResult {
 		if value == '}' {
 			isMarked = true
-			continue buffer_loop
+			continue
 		} else if isMarked {
 			switch value {
 			case 93, 94, 95:
@@ -91,7 +96,7 @@ buffer_loop:
 
 func (cl *CellAdvisor) initCellAdvisor() {
 
-	conn, err := net.Dial("tcp", cl.ip+":66")
+	conn, err := net.Dial("tcp", cl.ip+JDProtocolPort)
 	if err != nil {
 		panic(err)
 	}
@@ -115,17 +120,25 @@ func (cl CellAdvisor) SendSCPI(scpicmd string) (int, error) {
 	return cl.SendMessage(0x61, scpicmd+"\n")
 }
 
-func (cl CellAdvisor) getChecksum(data string) []byte {
+func maskingCommandCharacter(data []byte) []byte {
+	var result []byte
+	for _, character := range data {
+		switch character {
+		case 0x7e, 0x7d, 0x7f:
+			result = append(result, 0x7d, 0x20^character)
+		default:
+			result = append(result, character)
+		}
+	}
+	return result
+}
+
+func getChecksum(data []byte) byte {
 	total := 0
 	for _, value := range data {
 		total += int(value)
 	}
-	buff := total & 0xff
-	switch buff {
-	case 0x7e, 0x7d, 0x7f:
-		return []byte{0x7d, byte(buff ^ 0x20)}
-	}
-	return []byte{byte(buff)}
+	return byte(total & 0xff)
 }
 
 // NewCellAdvisor creates new CellAdvior object with given ip address
