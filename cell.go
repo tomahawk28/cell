@@ -23,6 +23,7 @@ package cell
 
 import (
 	"bufio"
+	"log"
 	"net"
 )
 
@@ -58,40 +59,24 @@ func (cl CellAdvisor) SendMessage(cmd byte, data string) (int, error) {
 
 func (cl CellAdvisor) GetMessage() ([]byte, error) {
 
-	isMarked := false
-	result, bufResult := []byte{}, []byte{}
+	bufResult := []byte{}
 	messageContinue := true
 	for messageContinue {
 		ret, err := cl.reader.ReadBytes(0x7e)
 		if err != nil {
 			return nil, err
 		}
-		//delete subsequent checksum if its marked
-		if ret[len(ret)-2] == '}' {
-			ret = ret[:len(ret)-3]
-		} else {
-			ret = ret[:len(ret)-2]
+		command, checksum := unmaskingCommandCharacter(ret[5 : len(ret)-1])
+		if realchecksum := getChecksum(append(ret[1:5], command...)); realchecksum != checksum {
+			log.Printf("checksum required to be: %c, but %c", realchecksum, checksum)
 		}
-		bufResult = append(bufResult, ret[5:]...)
+		bufResult = append(bufResult, command...)
 		if ret[3] <= ret[4]+1 {
 			messageContinue = false
 		}
 	}
 
-	for _, value := range bufResult {
-		if value == '}' {
-			isMarked = true
-			continue
-		} else if isMarked {
-			switch value {
-			case 93, 94, 95:
-				value = value ^ 0x20
-			}
-			isMarked = false
-		}
-		result = append(result, byte(value))
-	}
-	return result, nil
+	return bufResult, nil
 }
 
 func (cl *CellAdvisor) initCellAdvisor() {
@@ -131,6 +116,25 @@ func maskingCommandCharacter(data []byte) []byte {
 		}
 	}
 	return result
+}
+
+func unmaskingCommandCharacter(data []byte) ([]byte, byte) {
+	var result []byte
+	var masking bool = false
+	for _, character := range data {
+		switch character {
+		case 0x7d:
+			masking = true
+		default:
+			if masking {
+				masking = false
+				result = append(result, character^0x20)
+			} else {
+				result = append(result, character)
+			}
+		}
+	}
+	return result[:len(result)-1], result[len(result)-1]
 }
 
 func getChecksum(data []byte) byte {

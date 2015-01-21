@@ -63,7 +63,7 @@ func TestSendMessageAndGetMessageSync(t *testing.T) {
 	cl := NewCellAdvisor("")
 	for i := 0; i < 200; i++ {
 
-		result := randomBytes(100)
+		result := randomBytes(10)
 		_, err := cl.SendMessage(0x50, string(result[:]))
 		if err != nil {
 			t.Fatal(err)
