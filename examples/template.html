@@ -1,120 +1,22 @@
 <!DOCTYPE html>
 <html>
 <head>
-<script src="/static/1.11.1/jquery.min.js"></script>
-<script>
-
-var retryMills = 500
-var loadCompleted = false
-var refresh_screen_uri = "/api/screen/refresh_screen"
-
-function checkLoadStatus(retry){
-    if (loadCompleted){
-        loadCompleted=false
-        setTimeout(ScreenAjaxRequest,retryMills);
-    }else if (retry>0){
-       setTimeout(function() {
-                checkLoadStatus(retry-1);
-                }, 400);
-       if(typeof(console)!=undefined){
-           console.log("image load waiting: " + retry )
-       }
-    }else{
-        //retry dried out
-       if(typeof(console)!=undefined){
-        console.log("image load faild: " + retry )
-       }
-        alert("Check your network connection!")
-    }
-    
-}
-
-function completeStatus(){
-    loadCompleted = true
-}
-
-var ScreenAjaxRequest = function () {
-	$(".cell").each(function(i){
-		img = $(this)
-		$.ajax({
-			url: refresh_screen_uri,
-			type: 'POST',
-			timeout: 8000
-		}).fail(function(jqXHR, textStatus, errorThrown){
-			if(textStatus=="timeout"){
-				$("#info").html("Poor network connection")
-				setTimeout(ScreenAjaxRequest,retryMills*1.5);
-			}else{
-				alert("Connection failed, Try again:")
-			}
-		}).done(function(data){
-			if (data != null && data.length > 0) {
-				$("#info").html("")
-                $(img).attr("src", "/api/screen/screen?date="+new Date().getTime());
-			}
-            checkLoadStatus(40)
-		});
-	});
-};
-
-
-
-
-
-$(document).ready(function() {
-	  $(".cell").each(function(i){
-		 $(this).click(function(e) {
-			var offset = $(this).offset();
-			x= e.pageX - offset.left
-			y= e.pageY - offset.top
-			x= parseInt(x*1.33)
-			y= parseInt(y*1.33)
-			$.ajax({
-				url: "/api/scpi/touch",
-				type: 'POST',
-				data: {x: x, y: y},
-				success: function (result){
-				}
-			});
-		});
-	 });
-	 
-	 $(".keyp").each(function(i){
-		 $(this).click(function(e) {
-			$.ajax({
-				url: "/api/scpi/keyp",
-				type: 'POST',
-				data: {value: $(this).attr("value")},
-				success: function (result){
-				}
-			});
-		});
-	 });
-	 
-	 ScreenAjaxRequest ();
-});
-
-
-</script>
+<link rel="stylesheet" type="text/css" href="/static/css/style.css">
+<script src="/static/js/jquery/1.11.1/jquery.min.js"></script>
+<script src="/static/js/cell.js"></script>
 </head>
 <body>
 <ul>
    
-		<style type="text/css">
-	.tg  {border-collapse:collapse;border-spacing:0;}
-	.tg td{font-family:Arial, sans-serif;font-size:14px;padding:10px 5px;border-style:solid;border-width:1px;overflow:hidden;word-break:normal;text-align:center;}
-	.tg th{font-family:Arial, sans-serif;font-size:14px;font-weight:normal;padding:10px 5px;border-style:solid;border-width:1px;overflow:hidden;word-break:normal;}
-	.keyp {width: 80px;border-width: 2;}
-	</style>
 	<div id="info" class="info-box alert"></div>
 	<table>
 	<tr><td>
 	<table class="tg">
 	  <tr>
-		<th class="tg-031e" colspan="6" rowspan="9" style="padding-bottom:0px; padding-top:0px">
+		<th class="tg-031e" colspan="7" rowspan="9" style="padding-bottom:0px; padding-top:0px">
 		<img class="cell" width="600" height="450" onload="completeStatus()"/>
 		</th>
-		<th class="tg-031e"><button class="keyp" value="ESC">ESC</button></th>
+		<th class="tg-031e misc"><button class="keyp" value="ESC"><img src="/static/image/esc.png"/></button></th>
 	  </tr>
 	  <tr>
 		<td class="tg-031e"></td>
@@ -138,44 +40,45 @@ $(document).ready(function() {
 		<td class="tg-031e"></td>
 	  </tr>
 	  <tr>
-		<td class="tg-031e"><button class="keyp" value="PREV">Prev</button></td>
+		<td class="tg-031e misc"><button class="keyp" value="PREV"><img src="/static/image/prev.png"/></button></td>
 	  </tr>
 	  <tr>
-			<td class="tg-031e"><button class="keyp" value="MODE">Mode</button></td>
-			<td class="tg-031e"><button class="keyp" value="FREQ">Freq/Dist</button></td>
-			<td class="tg-031e"><button class="keyp" value="AMP">Amp/Scale</button></td>
-			<td class="tg-031e"><button class="keyp" value="BW">BW/AVG</button></td>
-			<td class="tg-031e"><button class="keyp" value="TRACE">Trace/ Display</button></td>
-			<td class="tg-031e"><button class="keyp" value="MARK">Marker</button></td>
-			<td class="tg-031e"><button class="keyp" value="PEAK">Peak Search</button></td>
+            <td class="tg-031e below"><button class="keyp" value="MODE"><img src="/static/image/Mode.png"/></button></td>
+            <td class="tg-031e below"><button class="keyp" value="FREQ"><img src="/static/image/FreqDist.png"/></button></td>
+			<td class="tg-031e below"><button class="keyp" value="AMP"><img src="/static/image/AmpScale.png"/></button></td>
+			<td class="tg-031e below"><button class="keyp" value="BW"><img src="/static/image/BwAvg.png"/></button></td>
+			<td class="tg-031e below"><button class="keyp" value="TRACE"><img src="/static/image/TraceDisplay.png"/></button></td>
+			<td class="tg-031e below"><button class="keyp" value="MARK"><img src="/static/image/Marker.png"/></button></td>
+			<td class="tg-031e below"><button class="keyp" value="PEAK"><img src="/static/image/PeakSearch.png"/></button></td>
+			<td class="tg-031e"></td>
 		  </tr>
 	</table>
 	</td><td>
 		
-<table class="tg">
+<table class="keypad" >
   <tr>
-    <th class="tg-031e"><button class="keyp numkey" value="NUM1">Measure<br/> 1</button></th>
-    <th class="tg-031e"><button class="keyp numkey" value="NUM2">Trigger<br/> 2</button></th>
-    <th class="tg-031e"><button class="keyp numkey" value="NUM3">System<br/> 3</button></th>
+    <th class="tg-031e"><button class="keyp" value="NUM1"><img src="/static/image/num1.png"/></button></th>
+    <th class="tg-031e"><button class="keyp" value="NUM2"><img src="/static/image/num2.png"/></button></th>
+    <th class="tg-031e"><button class="keyp" value="NUM3"><img src="/static/image/num3.png"/></button></th>
   </tr>
   <tr>
-    <td class="tg-031e"><button class="keyp numkey" value="NUM4">Measure Setup</br>4</button></td>
-    <td class="tg-031e"><button class="keyp numkey" value="NUM5">5</button></td>
-    <td class="tg-031e"><button class="keyp numkey" value="NUM6">Preset<br/>6</button></td>
+    <td class="tg-031e"><button class="keyp" value="NUM4"><img src="/static/image/num4.png"/></button></td>
+    <td class="tg-031e"><button class="keyp" value="NUM5"><img src="/static/image/num5.png"/></button></td>
+    <td class="tg-031e"><button class="keyp" value="NUM6"><img src="/static/image/num6.png"/></button></td>
   </tr>
   <tr>
-    <td class="tg-031e"><button class="keyp numkey" value="NUM7">Save/Load<br/>7</button></td>
-    <td class="tg-031e"><button class="keyp numkey" value="NUM8">Bright<br/>8</button></td>
-    <td class="tg-031e"><button class="keyp numkey" value="NUM9">Hold<br/>9</button></td>
+    <td class="tg-031e"><button class="keyp" value="NUM7"><img src="/static/image/num7.png"/></button></td>
+    <td class="tg-031e"><button class="keyp" value="NUM8"><img src="/static/image/num8.png"/></button></td>
+    <td class="tg-031e"><button class="keyp" value="NUM9"><img src="/static/image/num9.png"/></button></td>
   </tr>
   <tr>
-    <td class="tg-031e"><button class="keyp numkey" value="JUM">Sweep<br/>.</button></td>
-    <td class="tg-031e"><button class="keyp numkey" value="NUM0">Help<br/>0</button></td>
-    <td class="tg-031e"><button class="keyp numkey" value="BUHO">Limit<br/>+/-</button></td>
+    <td class="tg-031e"><button class="keyp" value="JUM"><img src="/static/image/dot.png"/></button></td>
+    <td class="tg-031e"><button class="keyp" value="NUM0"><img src="/static/image/num0.png"/></button></td>
+    <td class="tg-031e"><button class="keyp" value="BUHO"><img src="/static/image/buho.png"/></button></td>
   </tr>
   <tr>
-    <td class="tg-031e"><button class="keyp" value="DEL" style="width:40px">Del</button></td>
-    <td class="tg-031e" colspan="2"><button class="keyp" value="ENTER">Enter</button></td>
+    <td class="tg-031e"><button class="keyp" value="DEL" style="width:40px"><img src="/static/image/del.png"/></button></td>
+    <td class="tg-031e" colspan="2"><button class="keyp" value="ENTER"><img src="/static/image/enter.png"/></button></td>
   </tr>
 </table>
 </td></tr>
