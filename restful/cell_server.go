@@ -101,7 +101,6 @@ func (server cellServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	server.requestChannel <- request
 	result := receiveResult(request.result)
 	if result == nil {
-		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusServiceUnavailable)
 		w.Write([]byte("Poller thread respond timeout"))
 		return
@@ -120,32 +119,35 @@ func (server *cellServer) poller(cell *cell.CellAdvisor, threadNumber int) {
 	done := make(chan struct{})
 	defer close(done)
 	var err error
-	var msg []byte
 	for {
-		log.Println("waiting..", threadNumber)
+		msg := []byte{}
+		responseType := "text/plain"
+		num := 0
+		err = nil
 		select {
 		case request := <-server.requestChannel:
 			log.Println("Thread ", threadNumber, ":", request.command)
 			switch request.command {
 			case "keyp":
 				if value := request.args.Get("value"); value == "" {
-					sendResult(done, request.result, createResult(nil, "", errors.New("keyp value missing")))
+					err = errors.New("keyp value missing")
 				} else {
 					scpicmd := fmt.Sprintf("KEYP:%s", request.args.Get("value"))
-					_, err = cell.SendSCPI(scpicmd)
-					sendResult(done, request.result, createResult(okb, "", nil))
+					num, err = cell.SendSCPI(scpicmd)
+					msg = []byte(fmt.Sprintf("keypad: %d byte sent", num))
 				}
 			case "touch":
 				if x, y := request.args.Get("x"), request.args.Get("y"); x == "" || y == "" {
-					sendResult(done, request.result, createResult(nil, "", errors.New("x,y value missing")))
+					err = errors.New("x,y value missing")
 				} else {
 					scpicmd := fmt.Sprintf("KEYP %s %s", request.args.Get("x"), request.args.Get("y"))
-					_, err = cell.SendSCPI(scpicmd)
-					sendResult(done, request.result, createResult(okb, "", nil))
+					num, err = cell.SendSCPI(scpicmd)
+					msg = []byte(fmt.Sprintf("touch: %d byte sent", num))
 				}
 			case "screen":
+				responseType = "application/jpeg"
 				server.screenCache.mu.RLock()
-				sendResult(done, request.result, createResult(server.screenCache.cache, "application/jpeg", nil))
+				msg = server.screenCache.cache
 				server.screenCache.mu.RUnlock()
 			case "refresh_screen":
 				func() {
@@ -161,20 +163,16 @@ func (server *cellServer) poller(cell *cell.CellAdvisor, threadNumber int) {
 						}
 					}
 				}()
-				sendResult(done, request.result, createResult(okb, "", nil))
+				msg = []byte("refresh_screen : done")
 			case "interference_power":
-				js, err := cell.GetInterferencePower()
-				if err != nil {
-					sendResult(done, request.result, createResult(nil, "", err))
-				} else {
-					sendResult(done, request.result, createResult(js, "application/json", nil))
-				}
+				responseType = "application/json"
+				msg, err = cell.GetInterferencePower()
 			case "heartbeat":
 				msg, err = cell.GetStatusMessage()
-				sendResult(done, request.result, createResult(msg, "", nil))
 			default:
-				sendResult(done, request.result, createResult(nil, "", errors.New("unknown command")))
+				err = errors.New("Unknown command")
 			}
+			sendResult(done, request.result, createResult(msg, responseType, err))
 		case <-time.After(server.pollPeriod):
 			r := createRequest("heartbeat", nil)
 			server.requestChannel <- r
