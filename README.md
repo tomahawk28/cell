@@ -1,6 +1,8 @@
 # JDSU CellAdvisor RESTful API  
 JDSU CellAdvisor API by Go Language
 
+[![GoDoc](https://godoc.org/github.com/tomahawk28/cell/restful?status.svg)](https://godoc.org/github.com/tomahawk28/cell/restful)
+
 Usage 
 ------
 ```go
@@ -22,3 +24,12 @@ func main(){
 // Screen capture http://{celladvisorIP}:{port}/api/screen/{refresh_screen|screen}
 
 }
+```
+
+Maintainer
+------
+Ji-hyuk.Bok@jdsu.com
+
+License
+-----
+MIT
