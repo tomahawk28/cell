@@ -24,7 +24,7 @@ var (
 )
 
 var (
-	OKSIGN = []byte("OK")
+	okb = []byte("OK")
 )
 
 type pollRequest struct {
@@ -133,7 +133,7 @@ func (server *cellServer) poller(cell *cell.CellAdvisor, threadNumber int) {
 				} else {
 					scpicmd := fmt.Sprintf("KEYP:%s", request.args.Get("value"))
 					_, err = cell.SendSCPI(scpicmd)
-					sendResult(done, request.result, createResult([]byte("OK"), "", nil))
+					sendResult(done, request.result, createResult(okb, "", nil))
 				}
 			case "touch":
 				if x, y := request.args.Get("x"), request.args.Get("y"); x == "" || y == "" {
@@ -141,7 +141,7 @@ func (server *cellServer) poller(cell *cell.CellAdvisor, threadNumber int) {
 				} else {
 					scpicmd := fmt.Sprintf("KEYP %s %s", request.args.Get("x"), request.args.Get("y"))
 					_, err = cell.SendSCPI(scpicmd)
-					sendResult(done, request.result, createResult([]byte("OK"), "", nil))
+					sendResult(done, request.result, createResult(okb, "", nil))
 				}
 			case "screen":
 				server.screenCache.mu.RLock()
@@ -161,7 +161,7 @@ func (server *cellServer) poller(cell *cell.CellAdvisor, threadNumber int) {
 						}
 					}
 				}()
-				sendResult(done, request.result, createResult(OKSIGN, "", nil))
+				sendResult(done, request.result, createResult(okb, "", nil))
 			case "interference_power":
 				js, err := cell.GetInterferencePower()
 				if err != nil {
