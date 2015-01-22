@@ -1,24 +1,4 @@
-//JDSU CellAdvisor Go Library
-//Copyright (C) 2015 Jihyuk Bok <tomahawk28@gmail.com>
-//
-//Permission is hereby granted, free of charge, to any person obtaining
-//a copy of this software and associated documentation files (the "Software"),
-//to deal in the Software without restriction, including without limitation
-//the rights to use, copy, modify, merge, publish, distribute, sublicense,
-//and/or sell copies of the Software, and to permit persons to whom the
-//Software is furnished to do so, subject to the following conditions:
-//
-//The above copyright notice and this permission notice shall be included
-//in all copies or substantial portions of the Software.
-//
-//THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-//EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-//OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-//IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-//DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-//TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
-//OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
+// Package cell provides api connections between JDSU CellAdvisor Devices
 package cell
 
 import (
@@ -27,6 +7,7 @@ import (
 	"net"
 )
 
+// JDProtocol represents Port number which CellAdviosr TCP Connection uses
 var (
 	JDProtocolPort = ":66"
 )
@@ -39,7 +20,8 @@ type CellAdvisor struct {
 	writer *bufio.Writer
 }
 
-// SendMessage could send single cmd byte, and data strings
+// SendMessage send single cmd byte, and data strings and returing
+// the number of bytes send and followed error if any
 func (cl CellAdvisor) SendMessage(cmd byte, data string) (int, error) {
 
 	sendingMsg := []byte{'C', cmd, 0x01, 0x01}
@@ -57,6 +39,8 @@ func (cl CellAdvisor) SendMessage(cmd byte, data string) (int, error) {
 	return num, err
 }
 
+// GetMessage receive data right after it send request with SendMessage
+// it returns the data and followed error if any
 func (cl CellAdvisor) GetMessage() ([]byte, error) {
 
 	bufResult := []byte{}
@@ -89,13 +73,22 @@ func (cl *CellAdvisor) initCellAdvisor() {
 	cl.reader, cl.writer = bufio.NewReader(conn), bufio.NewWriter(conn)
 }
 
+// GetScreen returning current devices jpeg screenshot
 func (cl CellAdvisor) GetScreen() ([]byte, error) {
 	cl.SendMessage(0x60, "")
 	return cl.GetMessage()
 }
 
+// GetStatusMessage returning a heartbeat signal message from CellAdvisor
 func (cl CellAdvisor) GetStatusMessage() ([]byte, error) {
 	cl.SendMessage(0x50, "")
+	return cl.GetMessage()
+}
+
+// GetInterferencePower returning current interference power array
+// with json format
+func (cl CellAdvisor) GetInterferencePower() ([]byte, error) {
+	cl.SendMessage(0x83, "")
 	return cl.GetMessage()
 }
 
@@ -120,7 +113,7 @@ func maskingCommandCharacter(data []byte) []byte {
 
 func unmaskingCommandCharacter(data []byte) ([]byte, byte) {
 	var result []byte
-	var masking bool = false
+	var masking bool
 	for _, character := range data {
 		switch character {
 		case 0x7d:

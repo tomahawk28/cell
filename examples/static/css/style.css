@@ -14,3 +14,7 @@
 .below {
     background: #d8d8d8
 }
+.cell{
+    width:600px;
+    height:450px;
+}

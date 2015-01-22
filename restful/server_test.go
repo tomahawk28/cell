@@ -19,7 +19,7 @@ type testData struct {
 }
 
 var (
-	rtr           = BuildCellAdvisorRestfulAPI(4, "10.82.26.12", time.Second*10)
+	rtr           = BuildCellAdvisorRestfulAPI("", 4, "10.82.26.12", time.Second*10)
 	testDataArray = []testData{
 		testData{
 			subject:      "touch : Missing y value",
@@ -117,4 +117,24 @@ func TestSCPIArgument(t *testing.T) {
 		}
 	}
 
+}
+
+func BenchmarkProcessingRESTfulRequest(b *testing.B) {
+	sampletestcase := testDataArray[2]
+	v := createQuery(sampletestcase.argument)
+	var r *http.Request
+	for i := 0; i < b.N; i++ {
+		r, _ = http.NewRequest(sampletestcase.method, sampletestcase.url, strings.NewReader(v.Encode()))
+		r.Form = v
+		w := httptest.NewRecorder()
+		rtr.ServeHTTP(w, r)
+		if content := w.Body.String(); !strings.Contains(content, sampletestcase.expected) {
+			b.Logf("inner testcases : %s", sampletestcase.subject)
+			b.Fatalf("body = %s, want %s", content, sampletestcase.expected)
+		}
+		if w.Code != sampletestcase.expectedCode {
+			b.Logf("inner testcases : %s", sampletestcase.subject)
+			b.Fatalf("code = %d, want %d", w.Code, sampletestcase.expectedCode)
+		}
+	}
 }

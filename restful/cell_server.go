@@ -1,24 +1,4 @@
-//JDSU CellAdvisor Web-Live Program
-//Copyright (C) 2015 Jihyuk Bok <tomahawk28@gmail.com>
-//
-//Permission is hereby granted, free of charge, to any person obtaining
-//a copy of this software and associated documentation files (the "Software"),
-//to deal in the Software without restriction, including without limitation
-//the rights to use, copy, modify, merge, publish, distribute, sublicense,
-//and/or sell copies of the Software, and to permit persons to whom the
-//Software is furnished to do so, subject to the following conditions:
-//
-//The above copyright notice and this permission notice shall be included
-//in all copies or substantial portions of the Software.
-//
-//THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-//EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-//OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-//IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-//DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-//TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
-//OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
+// Package restful provides RESTful API features to CellAdvisor
 package restful
 
 import (
@@ -70,7 +50,8 @@ type cellServer struct {
 	pollPeriod     time.Duration
 }
 
-func NewCellHttpServer(threadNumber int, cellAddr string, pollPeriod time.Duration) cellServer {
+// NewCellHTTPServer retuning CellAdviosr http server object
+func createCellAdvisorHTTPServer(threadNumber int, cellAddr string, pollPeriod time.Duration) cellServer {
 	screenCache := pollScreenCache{time.Now(), []byte{}, sync.RWMutex{}}
 	mu := sync.RWMutex{}
 
@@ -86,12 +67,15 @@ func NewCellHttpServer(threadNumber int, cellAddr string, pollPeriod time.Durati
 	return server
 }
 
-func BuildCellAdvisorRestfulAPI(threadNumber int, cellAddr string, pollPeriod time.Duration) *mux.Router {
-	s := NewCellHttpServer(threadNumber, cellAddr, pollPeriod)
+// BuildCellAdvisorRestfulAPI returning automatic RESTful API server set
+// user could access directly api/screen/*, and api/scpi/*
+// after deploy retuning object to sever
+func BuildCellAdvisorRestfulAPI(prefix string, threadNumber int, cellAddr string, pollPeriod time.Duration) *mux.Router {
+	s := createCellAdvisorHTTPServer(threadNumber, cellAddr, pollPeriod)
 
 	rtr := mux.NewRouter()
-	rtr.Handle("/api/screen/{command}", s)
-	rtr.Handle("/api/scpi/{command}", s).Methods("POST")
+	rtr.Handle("/"+prefix+"api/screen/{command}", s)
+	rtr.Handle("/"+prefix+"api/scpi/{command}", s).Methods("POST")
 
 	return rtr
 }
@@ -109,7 +93,7 @@ func (server cellServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		values = r.Form
 	}
-	request := NewRequest(command, values)
+	request := createRequest(command, values)
 	server.requestChannel <- request
 	result := receiveResult(request.result)
 	if result == nil {
@@ -158,7 +142,7 @@ func (server *cellServer) poller(cell *cell.CellAdvisor, threadNumber int) {
 				sendResult(done, request.result, pollResult{server.screenCache.cache, nil})
 				server.screenCache.mu.RUnlock()
 			case "refresh_screen":
-				go func() {
+				func() {
 					if len(server.screenCache.cache) == 0 || time.Now().Sub(server.screenCache.last).Seconds() > 1 {
 						server.screenCache.mu.Lock()
 						defer server.screenCache.mu.Unlock()
@@ -197,7 +181,7 @@ func (server *cellServer) poller(cell *cell.CellAdvisor, threadNumber int) {
 	}
 }
 
-func NewRequest(command string, args url.Values) *pollRequest {
+func createRequest(command string, args url.Values) *pollRequest {
 	return &pollRequest{command, args, make(chan pollResult)}
 }
 
