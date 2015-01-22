@@ -23,6 +23,10 @@ var (
 	receivePendingCount = expvar.NewInt("receivePendingCount")
 )
 
+var (
+	OKSIGN = []byte("OK")
+)
+
 type pollRequest struct {
 	command string
 	args    url.Values
@@ -30,8 +34,9 @@ type pollRequest struct {
 }
 
 type pollResult struct {
-	resultByte []byte
-	requestErr error
+	resultByte  []byte
+	requestType string
+	requestErr  error
 }
 
 type pollScreenCache struct {
@@ -45,7 +50,6 @@ type cellServer struct {
 	//ScreenCache implements web cache, for any cases clients order new screen image,
 	//API fetch screen only if its 1 minutes later after last capture
 	screenCache    pollScreenCache
-	mu             sync.RWMutex
 	requestChannel chan *pollRequest
 	pollPeriod     time.Duration
 }
@@ -53,11 +57,10 @@ type cellServer struct {
 // NewCellHTTPServer retuning CellAdviosr http server object
 func createCellAdvisorHTTPServer(threadNumber int, cellAddr string, pollPeriod time.Duration) cellServer {
 	screenCache := pollScreenCache{time.Now(), []byte{}, sync.RWMutex{}}
-	mu := sync.RWMutex{}
 
 	rc := make(chan *pollRequest, threadNumber)
 
-	server := cellServer{screenCache, mu, rc, pollPeriod}
+	server := cellServer{screenCache, rc, pollPeriod}
 
 	for i := 0; i < threadNumber; i++ {
 		element := cell.NewCellAdvisor(cellAddr)
@@ -71,9 +74,10 @@ func createCellAdvisorHTTPServer(threadNumber int, cellAddr string, pollPeriod t
 // user could access directly api/screen/*, and api/scpi/*
 // after deploy retuning object to sever
 func BuildCellAdvisorRestfulAPI(prefix string, threadNumber int, cellAddr string, pollPeriod time.Duration) *mux.Router {
-	s := createCellAdvisorHTTPServer(threadNumber, cellAddr, pollPeriod)
 
+	s := createCellAdvisorHTTPServer(threadNumber, cellAddr, pollPeriod)
 	rtr := mux.NewRouter()
+	rtr.Handle("/"+prefix+"api/{command}.json", s)
 	rtr.Handle("/"+prefix+"api/screen/{command}", s)
 	rtr.Handle("/"+prefix+"api/scpi/{command}", s).Methods("POST")
 
@@ -97,10 +101,12 @@ func (server cellServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	server.requestChannel <- request
 	result := receiveResult(request.result)
 	if result == nil {
+		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusServiceUnavailable)
 		w.Write([]byte("Poller thread respond timeout"))
 		return
 	}
+	w.Header().Set("Content-Type", result.requestType)
 	if result.requestErr != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte(result.requestErr.Error()))
@@ -123,23 +129,23 @@ func (server *cellServer) poller(cell *cell.CellAdvisor, threadNumber int) {
 			switch request.command {
 			case "keyp":
 				if value := request.args.Get("value"); value == "" {
-					sendResult(done, request.result, pollResult{nil, errors.New("keyp value missing")})
+					sendResult(done, request.result, createResult(nil, "", errors.New("keyp value missing")))
 				} else {
 					scpicmd := fmt.Sprintf("KEYP:%s", request.args.Get("value"))
 					_, err = cell.SendSCPI(scpicmd)
-					sendResult(done, request.result, pollResult{[]byte("OK"), nil})
+					sendResult(done, request.result, createResult([]byte("OK"), "", nil))
 				}
 			case "touch":
 				if x, y := request.args.Get("x"), request.args.Get("y"); x == "" || y == "" {
-					sendResult(done, request.result, pollResult{nil, errors.New("x,y value missing")})
+					sendResult(done, request.result, createResult(nil, "", errors.New("x,y value missing")))
 				} else {
 					scpicmd := fmt.Sprintf("KEYP %s %s", request.args.Get("x"), request.args.Get("y"))
 					_, err = cell.SendSCPI(scpicmd)
-					sendResult(done, request.result, pollResult{[]byte("OK"), nil})
+					sendResult(done, request.result, createResult([]byte("OK"), "", nil))
 				}
 			case "screen":
 				server.screenCache.mu.RLock()
-				sendResult(done, request.result, pollResult{server.screenCache.cache, nil})
+				sendResult(done, request.result, createResult(server.screenCache.cache, "application/jpeg", nil))
 				server.screenCache.mu.RUnlock()
 			case "refresh_screen":
 				func() {
@@ -155,18 +161,24 @@ func (server *cellServer) poller(cell *cell.CellAdvisor, threadNumber int) {
 						}
 					}
 				}()
-				sendResult(done, request.result, pollResult{[]byte("OK"), nil})
+				sendResult(done, request.result, createResult(OKSIGN, "", nil))
+			case "interference_power":
+				js, err := cell.GetInterferencePower()
+				if err != nil {
+					sendResult(done, request.result, createResult(nil, "", err))
+				} else {
+					sendResult(done, request.result, createResult(js, "application/json", nil))
+				}
 			case "heartbeat":
 				msg, err = cell.GetStatusMessage()
-				sendResult(done, request.result, pollResult{[]byte(msg), nil})
+				sendResult(done, request.result, createResult(msg, "", nil))
 			default:
-				sendResult(done, request.result, pollResult{nil, errors.New("unknown command")})
+				sendResult(done, request.result, createResult(nil, "", errors.New("unknown command")))
 			}
 		case <-time.After(server.pollPeriod):
-			server.mu.Lock()
-			msg, err = cell.GetStatusMessage()
-			log.Println("Hearbeat:", threadNumber, string(msg))
-			server.mu.Unlock()
+			r := createRequest("heartbeat", nil)
+			server.requestChannel <- r
+			<-r.result
 		}
 		//Check Error Status == EOF
 		if err != nil {
@@ -183,6 +195,13 @@ func (server *cellServer) poller(cell *cell.CellAdvisor, threadNumber int) {
 
 func createRequest(command string, args url.Values) *pollRequest {
 	return &pollRequest{command, args, make(chan pollResult)}
+}
+
+func createResult(result []byte, resultType string, err error) pollResult {
+	if resultType == "" {
+		resultType = "text/plain"
+	}
+	return pollResult{result, resultType, err}
 }
 
 func sendResult(done <-chan struct{}, pipe chan<- pollResult, result pollResult) {

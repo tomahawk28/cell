@@ -3,8 +3,12 @@ package cell
 
 import (
 	"bufio"
+	"encoding/json"
+	"errors"
 	"log"
 	"net"
+	"regexp"
+	"strconv"
 )
 
 // JDProtocol represents Port number which CellAdviosr TCP Connection uses
@@ -18,6 +22,11 @@ type CellAdvisor struct {
 	ip     string
 	reader *bufio.Reader
 	writer *bufio.Writer
+}
+
+type InterferencePower struct {
+	Unit       string    `json:"Unit"`
+	Powertrace []float32 `json:"Powertrace"`
 }
 
 // SendMessage send single cmd byte, and data strings and returing
@@ -89,7 +98,31 @@ func (cl CellAdvisor) GetStatusMessage() ([]byte, error) {
 // with json format
 func (cl CellAdvisor) GetInterferencePower() ([]byte, error) {
 	cl.SendMessage(0x83, "")
-	return cl.GetMessage()
+	ret, err := cl.GetMessage()
+
+	reunit := regexp.MustCompile("Unit=\"([a-zA-Z]+)\"")
+	repower := regexp.MustCompile("P([0-9]+)+=\"(-*[0-9]+.[0-9]+)\"")
+
+	unit := reunit.FindStringSubmatch(string(ret))
+	trace := repower.FindAllStringSubmatch(string(ret), -1)
+	if trace == nil || unit == nil {
+		return ret, errors.New("Not an Interference XML source")
+	}
+
+	powertrace := make([]float32, len(trace))
+	for i, v := range trace {
+		convertfloatResult, err := strconv.ParseFloat(v[len(v)-1], 32)
+		powertrace[i] = float32(convertfloatResult)
+		if err != nil {
+			return nil, err
+		}
+	}
+	t := InterferencePower{Unit: unit[1], Powertrace: powertrace}
+	b, err := json.Marshal(t)
+	if err != nil {
+		return nil, err
+	}
+	return b, nil
 }
 
 // SendSCPI sends SCPI commands to CellAdvisor devices

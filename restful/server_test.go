@@ -16,6 +16,7 @@ type testData struct {
 	argument     map[string]string
 	expected     string
 	expectedCode int
+	expectedType string
 }
 
 var (
@@ -28,6 +29,7 @@ var (
 			argument:     map[string]string{"x": "10"},
 			expected:     "value missing",
 			expectedCode: http.StatusBadRequest,
+			expectedType: "text/plain",
 		},
 		testData{
 			subject:      "touch : X, Y Exist",
@@ -36,6 +38,7 @@ var (
 			argument:     map[string]string{"x": "10", "y": "20"},
 			expected:     "OK",
 			expectedCode: http.StatusOK,
+			expectedType: "text/plain",
 		},
 		testData{
 			subject:      "keyp : value given",
@@ -44,6 +47,7 @@ var (
 			argument:     map[string]string{"value": "MODE"},
 			expected:     "OK",
 			expectedCode: http.StatusOK,
+			expectedType: "text/plain",
 		},
 		testData{
 			subject:      "keyp : value not given",
@@ -52,6 +56,7 @@ var (
 			argument:     map[string]string{},
 			expected:     "keyp value missing",
 			expectedCode: http.StatusBadRequest,
+			expectedType: "text/plain",
 		},
 		testData{
 			subject:      "refresh_screen : ",
@@ -60,6 +65,7 @@ var (
 			argument:     map[string]string{},
 			expected:     "OK",
 			expectedCode: http.StatusOK,
+			expectedType: "text/plain",
 		},
 		testData{
 			subject:      "screen : ",
@@ -68,6 +74,7 @@ var (
 			argument:     map[string]string{},
 			expected:     "JFIF",
 			expectedCode: http.StatusOK,
+			expectedType: "application/jpeg",
 		},
 		testData{
 			subject:      "unknown command : ",
@@ -76,6 +83,16 @@ var (
 			argument:     map[string]string{},
 			expected:     "unknown",
 			expectedCode: http.StatusBadRequest,
+			expectedType: "text/plain",
+		},
+		testData{
+			subject:      "interference_power : ",
+			url:          "/api/interference_power.json",
+			method:       "GET",
+			argument:     map[string]string{},
+			expected:     "Power",
+			expectedCode: http.StatusOK,
+			expectedType: "application/json",
 		},
 	}
 )
@@ -114,6 +131,10 @@ func TestSCPIArgument(t *testing.T) {
 		if w.Code != testcase.expectedCode {
 			t.Logf("inner testcases : %s", testcase.subject)
 			t.Fatalf("code = %d, want %d", w.Code, testcase.expectedCode)
+		}
+		if contenttype := w.Header().Get("Content-Type"); contenttype != testcase.expectedType {
+			t.Logf("inner testcases : %s", testcase.subject)
+			t.Fatalf("type = %s, want %s", contenttype, testcase.expectedType)
 		}
 	}
 
