@@ -1,6 +1,6 @@
 # JDSU CellAdvisor RESTful API  
 JDSU CellAdvisor API by Go Language
-
+[![GoDoc](https://godoc.org/github.com/tomahawk28/cell/restful?status.svg)](https://godoc.org/github.com/tomahawk28/cell/restful)
 Usage 
 ------
 ```go
