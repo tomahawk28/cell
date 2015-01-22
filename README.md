@@ -22,3 +22,11 @@ func main(){
 // Screen capture http://{celladvisorIP}:{port}/api/screen/{refresh_screen|screen}
 
 }
+
+Maintainer
+------
+Ji-hyuk.Bok@jdsu.com
+
+License
+-----
+MIT
