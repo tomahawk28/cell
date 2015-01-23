@@ -1,6 +1,12 @@
 # JDSU CellAdvisor RESTful API  
 JDSU CellAdvisor API by Go Language
 
+CellAdvisor API 
+---
+[![GoDoc](https://godoc.org/github.com/tomahawk28/cell?status.svg)](https://godoc.org/github.com/tomahawk28/cell)
+
+RESTful API Implementation
+---
 [![GoDoc](https://godoc.org/github.com/tomahawk28/cell/restful?status.svg)](https://godoc.org/github.com/tomahawk28/cell/restful)
 
 Usage 
@@ -9,10 +15,9 @@ Usage
 func main(){
 
  // BuildCellAdvisorRestfulAPI functions get argumets 
- // 1. RESTFul prefix URL string 
- // 2. The number of TCP connections for API
- // 3. CellAdvisor IP 
- // 4. Heartbeat cheking period
+ // 1. The number of TCP connections for API
+ // 2. CellAdvisor IP 
+ // 3. Heartbeat cheking period
  // for example, 
 
  rtr := restful.BuildCellAdvisorRestfulAPI("", 4, "192.168.0.1", time.Second*10)
