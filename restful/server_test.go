@@ -20,7 +20,7 @@ type testData struct {
 }
 
 var (
-	rtr           = BuildCellAdvisorRestfulAPI("", 4, "10.82.26.12", time.Second*10)
+	rtr           = BuildCellAdvisorRestfulAPI(4, "10.82.26.12", time.Second*10)
 	testDataArray = []testData{
 		testData{
 			subject:      "touch : Missing y value",
@@ -29,7 +29,7 @@ var (
 			argument:     map[string]string{"x": "10"},
 			expected:     "value missing",
 			expectedCode: http.StatusBadRequest,
-			expectedType: "text/plain",
+			expectedType: "application/json",
 		},
 		testData{
 			subject:      "touch : X, Y Exist",
@@ -38,7 +38,7 @@ var (
 			argument:     map[string]string{"x": "10", "y": "20"},
 			expected:     "sent",
 			expectedCode: http.StatusOK,
-			expectedType: "text/plain",
+			expectedType: "application/json",
 		},
 		testData{
 			subject:      "keyp : value given",
@@ -47,7 +47,7 @@ var (
 			argument:     map[string]string{"value": "MODE"},
 			expected:     "sent",
 			expectedCode: http.StatusOK,
-			expectedType: "text/plain",
+			expectedType: "application/json",
 		},
 		testData{
 			subject:      "keyp : value not given",
@@ -56,7 +56,7 @@ var (
 			argument:     map[string]string{},
 			expected:     "keyp value missing",
 			expectedCode: http.StatusBadRequest,
-			expectedType: "text/plain",
+			expectedType: "application/json",
 		},
 		testData{
 			subject:      "refresh_screen : ",
@@ -65,7 +65,7 @@ var (
 			argument:     map[string]string{},
 			expected:     "done",
 			expectedCode: http.StatusOK,
-			expectedType: "text/plain",
+			expectedType: "application/json",
 		},
 		testData{
 			subject:      "screen : ",
@@ -81,9 +81,9 @@ var (
 			url:          "/api/scpi/heyoman",
 			method:       "POST",
 			argument:     map[string]string{},
-			expected:     "Unknown",
+			expected:     "unknown",
 			expectedCode: http.StatusBadRequest,
-			expectedType: "text/plain",
+			expectedType: "application/json",
 		},
 		testData{
 			subject:      "interference_power : ",

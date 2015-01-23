@@ -89,14 +89,15 @@ func (cl CellAdvisor) GetScreen() ([]byte, error) {
 }
 
 // GetStatusMessage returning a heartbeat signal message from CellAdvisor
-func (cl CellAdvisor) GetStatusMessage() ([]byte, error) {
+func (cl CellAdvisor) GetStatusMessage() (string, error) {
 	cl.SendMessage(0x50, "")
-	return cl.GetMessage()
+	ret, err := cl.GetMessage()
+	return string(ret), err
 }
 
 // GetInterferencePower returning current interference power array
 // with json format
-func (cl CellAdvisor) GetInterferencePower() ([]byte, error) {
+func (cl CellAdvisor) GetInterferencePower() (string, error) {
 	cl.SendMessage(0x83, "")
 	ret, err := cl.GetMessage()
 
@@ -106,7 +107,7 @@ func (cl CellAdvisor) GetInterferencePower() ([]byte, error) {
 	unit := reunit.FindStringSubmatch(string(ret))
 	trace := repower.FindAllStringSubmatch(string(ret), -1)
 	if trace == nil || unit == nil {
-		return ret, errors.New("Not an Interference XML source")
+		return "", errors.New("Not an Interference XML source")
 	}
 
 	powertrace := make([]float32, len(trace))
@@ -114,15 +115,15 @@ func (cl CellAdvisor) GetInterferencePower() ([]byte, error) {
 		convertfloatResult, err := strconv.ParseFloat(v[len(v)-1], 32)
 		powertrace[i] = float32(convertfloatResult)
 		if err != nil {
-			return nil, err
+			return "", err
 		}
 	}
 	t := InterferencePower{Unit: unit[1], Powertrace: powertrace}
 	b, err := json.Marshal(t)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	return b, nil
+	return string(b), nil
 }
 
 // SendSCPI sends SCPI commands to CellAdvisor devices
