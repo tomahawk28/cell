@@ -9,8 +9,8 @@ RESTful API Implementation
 ---
 [![GoDoc](https://godoc.org/github.com/tomahawk28/cell/restful?status.svg)](https://godoc.org/github.com/tomahawk28/cell/restful)
 
-Usage 
-------
+RESTful API Usage 
+--
 ```go
 func main(){
 
@@ -20,7 +20,7 @@ func main(){
  // 3. Heartbeat cheking period
  // for example, 
 
- rtr := restful.BuildCellAdvisorRestfulAPI("", 4, "192.168.0.1", time.Second*10)
+ rtr := restful.BuildCellAdvisorRestfulAPI(4, "192.168.0.1", time.Second*10)
  http.Handle("/api/", rtr)
  log.Fatal(http.ListenAndServe(":80", nil))
 
