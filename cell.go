@@ -10,8 +10,8 @@ import (
 	"strconv"
 )
 
-// JDProtocol represents Port number which CellAdviosr TCP Connection uses
 var (
+	//JDProtocolPort represents Port number which CellAdviosr TCP Connection uses
 	JDProtocolPort = ":66"
 )
 
@@ -23,8 +23,11 @@ type CellAdvisor struct {
 	writer *bufio.Writer
 }
 
+// InterferencePower represents interferences data given by CellAdvisor
 type InterferencePower struct {
-	Unit       string    `json:"Unit"`
+	// Unit represents real unit of following float array
+	Unit string `json:"Unit"`
+	// PowerTrace is measured power array based on frequency plan
 	Powertrace []float32 `json:"Powertrace"`
 }
 
@@ -109,7 +112,7 @@ func (cl CellAdvisor) GetInterferencePower() (*InterferencePower, error) {
 	unit := reunit.FindStringSubmatch(string(ret))
 	trace := repower.FindAllStringSubmatch(string(ret), -1)
 	if trace == nil || unit == nil {
-		return nil, errors.New("Input is not an interference XML source")
+		return nil, errors.New("input is not an interference XML source")
 	}
 
 	powertrace := make([]float32, len(trace))

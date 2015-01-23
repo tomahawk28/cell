@@ -39,10 +39,8 @@ func (result pollResult) String() string {
 	if result.isbinary {
 		if v, ok := result.data.([]byte); ok {
 			return string(v)
-		} else {
-			fmt.Println("FUCKNO")
-			return ""
 		}
+		return ""
 	}
 	middledata := map[string]interface{}{
 		"success": result.code == http.StatusOK,
