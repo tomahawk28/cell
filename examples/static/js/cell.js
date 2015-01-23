@@ -2,6 +2,12 @@ var retryMills = 100
 var loadCompleted = false
 var refresh_screen_uri = "/api/screen/refresh_screen"
 
+//For handling IE Warning: 
+if (typeof console === "undefined" || typeof console.log === "undefined") {
+    console = {}
+    console.log = function() {};
+}
+
 function checkLoadStatus(retry){
     if (loadCompleted){
         loadCompleted=false
@@ -41,10 +47,14 @@ var ScreenAjaxRequest = function () {
 			}else{
 				alert("Connection failed, Try again:")
 			}
-		}).done(function(data){
-			if (data != null && data.length > 0) {
-				$("#info").html("")
-                $(img).attr("src", "/api/screen/screen?date="+new Date().getTime());
+		}).done(function(result){
+			if (result != undefined){
+                if(result.success){
+                    $("#info").html("")
+                    $(img).attr("src", "/api/screen/screen?date="+new Date().getTime());
+                }else{
+                    $("#info").html("Refresh Screenshot failed, " + result.data)
+                }
 			}
             checkLoadStatus(40)
 		});

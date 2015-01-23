@@ -30,14 +30,19 @@ type pollRequest struct {
 }
 
 type pollResult struct {
-	code       int
-	data       string
-	binarydata []byte
+	code     int
+	isbinary bool
+	data     interface{}
 }
 
 func (result pollResult) String() string {
-	if result.binarydata != nil {
-		return string(result.binarydata)
+	if result.isbinary {
+		if v, ok := result.data.([]byte); ok {
+			return string(v)
+		} else {
+			fmt.Println("FUCKNO")
+			return ""
+		}
 	}
 	middledata := map[string]interface{}{
 		"success": result.code == http.StatusOK,
@@ -119,12 +124,12 @@ func (server cellServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Poller thread respond timeout"))
 		return
 	}
-	w.WriteHeader(result.code)
-	if result.binarydata == nil {
-		w.Header().Set("Content-Type", "application/json")
-	} else {
+	if result.isbinary {
 		w.Header().Set("Content-Type", "application/jpeg")
+	} else {
+		w.Header().Set("Content-Type", "application/json")
 	}
+	w.WriteHeader(result.code)
 	fmt.Fprintf(w, "%s", result)
 	//w.Write([]byte(result.requestErr.Error()))
 	return
@@ -134,10 +139,10 @@ func (server *cellServer) poller(cell *cell.CellAdvisor, threadNumber int) {
 	done := make(chan struct{})
 	defer close(done)
 	var err error
-	var data string
-	var binarydata []byte
+	var data interface{}
+	var isbinary bool
 	for {
-		data, binarydata = "", nil
+		data, isbinary = "", false
 		numsent, code := 0, http.StatusOK
 		err = nil
 
@@ -175,7 +180,8 @@ func (server *cellServer) poller(cell *cell.CellAdvisor, threadNumber int) {
 				}
 			case "screen":
 				server.screenCache.mu.RLock()
-				binarydata = server.screenCache.cache
+				isbinary = true
+				data = server.screenCache.cache
 				server.screenCache.mu.RUnlock()
 			case "refresh_screen":
 				func() {
@@ -209,7 +215,7 @@ func (server *cellServer) poller(cell *cell.CellAdvisor, threadNumber int) {
 				code = http.StatusBadRequest
 				data = fmt.Sprintf("unknown command name : %s", request.command)
 			}
-			sendResult(done, request.result, pollResult{code, data, binarydata})
+			sendResult(done, request.result, pollResult{code, isbinary, data})
 		case <-time.After(server.pollPeriod):
 			r := createRequest("heartbeat", nil)
 			server.requestChannel <- r

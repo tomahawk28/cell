@@ -3,7 +3,6 @@ package cell
 
 import (
 	"bufio"
-	"encoding/json"
 	"errors"
 	"log"
 	"net"
@@ -97,9 +96,12 @@ func (cl CellAdvisor) GetStatusMessage() (string, error) {
 
 // GetInterferencePower returning current interference power array
 // with json format
-func (cl CellAdvisor) GetInterferencePower() (string, error) {
+func (cl CellAdvisor) GetInterferencePower() (*InterferencePower, error) {
 	cl.SendMessage(0x83, "")
 	ret, err := cl.GetMessage()
+	if err != nil {
+		return nil, err
+	}
 
 	reunit := regexp.MustCompile("Unit=\"([a-zA-Z]+)\"")
 	repower := regexp.MustCompile("P([0-9]+)+=\"(-*[0-9]+.[0-9]+)\"")
@@ -107,7 +109,7 @@ func (cl CellAdvisor) GetInterferencePower() (string, error) {
 	unit := reunit.FindStringSubmatch(string(ret))
 	trace := repower.FindAllStringSubmatch(string(ret), -1)
 	if trace == nil || unit == nil {
-		return "", errors.New("Not an Interference XML source")
+		return nil, errors.New("Input is not an interference XML source")
 	}
 
 	powertrace := make([]float32, len(trace))
@@ -115,15 +117,10 @@ func (cl CellAdvisor) GetInterferencePower() (string, error) {
 		convertfloatResult, err := strconv.ParseFloat(v[len(v)-1], 32)
 		powertrace[i] = float32(convertfloatResult)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 	}
-	t := InterferencePower{Unit: unit[1], Powertrace: powertrace}
-	b, err := json.Marshal(t)
-	if err != nil {
-		return "", err
-	}
-	return string(b), nil
+	return &InterferencePower{Unit: unit[1], Powertrace: powertrace}, nil
 }
 
 // SendSCPI sends SCPI commands to CellAdvisor devices
