@@ -20,7 +20,7 @@ type testData struct {
 }
 
 var (
-	rtr           = BuildCellAdvisorRestfulAPI(4, "10.82.26.12", time.Second*10)
+	rtr           = NewCellAdvisorServer(4, "10.82.26.12", time.Second*10)
 	testDataArray = []testData{
 		testData{
 			subject:      "touch : Missing y value",

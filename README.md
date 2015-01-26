@@ -20,8 +20,8 @@ func main(){
  // 3. Heartbeat cheking period
  // for example, 
 
- rtr := restful.BuildCellAdvisorRestfulAPI(4, "192.168.0.1", time.Second*10)
- http.Handle("/api/", rtr)
+ server := restful.NewCellAdvisorServer(4, "192.168.0.1", time.Second*10)
+ http.Handle("/api/", server)
  log.Fatal(http.ListenAndServe(":80", nil))
 
 // Now you could access 
