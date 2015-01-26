@@ -47,9 +47,9 @@ func main() {
 
 	flag.Parse()
 
-	rtr := restful.BuildCellAdvisorRestfulAPI(int(*numsport), *cellAdvisorAddr, *pollPeriod)
+	api := restful.NewCellAdvisorServer(int(*numsport), *cellAdvisorAddr, *pollPeriod)
 
-	http.Handle("/api/", rtr)
+	http.Handle("/api/", api)
 
 	http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
 		err := tmpl.Execute(w, nil)

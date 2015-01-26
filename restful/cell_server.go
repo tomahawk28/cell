@@ -59,44 +59,39 @@ func (result pollResult) String() string {
 type pollScreenCache struct {
 	last  time.Time
 	cache []byte
-	mu    sync.RWMutex
 }
 
 // cellServer implements http API method to cellAdvisor,
 type cellServer struct {
 	//ScreenCache implements web cache, for any cases clients order new screen image,
 	//API fetch screen only if its 1 minutes later after last capture
-	screenCache    pollScreenCache
+	screenCache pollScreenCache
+	//requestchannel get every http request and serve to our poller goroutines
 	requestChannel chan *pollRequest
 	pollPeriod     time.Duration
+	mutex          sync.RWMutex
 }
 
-// NewCellHTTPServer retuning CellAdviosr http server object
-func createCellAdvisorHTTPServer(threadNumber int, cellAddr string, pollPeriod time.Duration) cellServer {
-	screenCache := pollScreenCache{time.Now(), []byte{}, sync.RWMutex{}}
+// NewCellAdvisorServer returning automatic RESTful API server set
+// user could access directly api/screen/*, and api/scpi/*
+// after deploy retuning object to sever
+func NewCellAdvisorServer(threadNumber int, cellAddr string, pollPeriod time.Duration) *mux.Router {
 
-	rc := make(chan *pollRequest, threadNumber)
+	screenCache := pollScreenCache{time.Now(), []byte{}}
 
-	server := cellServer{screenCache, rc, pollPeriod}
+	requestChannel := make(chan *pollRequest, threadNumber)
+
+	server := cellServer{screenCache, requestChannel, pollPeriod, sync.RWMutex{}}
 
 	for i := 0; i < threadNumber; i++ {
 		element := cell.NewCellAdvisor(cellAddr)
 		go server.poller(&element, i)
 	}
 
-	return server
-}
-
-// BuildCellAdvisorRestfulAPI returning automatic RESTful API server set
-// user could access directly api/screen/*, and api/scpi/*
-// after deploy retuning object to sever
-func BuildCellAdvisorRestfulAPI(threadNumber int, cellAddr string, pollPeriod time.Duration) *mux.Router {
-
-	s := createCellAdvisorHTTPServer(threadNumber, cellAddr, pollPeriod)
 	rtr := mux.NewRouter()
-	rtr.Handle("/api/{command}.json", s)
-	rtr.Handle("/api/screen/{command}", s)
-	rtr.Handle("/api/scpi/{command}", s).Methods("POST")
+	rtr.Handle("/api/{command}.json", server)
+	rtr.Handle("/api/screen/{command}", server)
+	rtr.Handle("/api/scpi/{command}", server).Methods("POST")
 
 	return rtr
 }
@@ -177,15 +172,15 @@ func (server *cellServer) poller(cell *cell.CellAdvisor, threadNumber int) {
 					}
 				}
 			case "screen":
-				server.screenCache.mu.RLock()
+				server.mutex.RLock()
 				isbinary = true
 				data = server.screenCache.cache
-				server.screenCache.mu.RUnlock()
+				server.mutex.RUnlock()
 			case "refresh_screen":
 				func() {
 					if len(server.screenCache.cache) == 0 || time.Now().Sub(server.screenCache.last).Seconds() > 1 {
-						server.screenCache.mu.Lock()
-						defer server.screenCache.mu.Unlock()
+						server.mutex.Lock()
+						defer server.mutex.Unlock()
 						if len(server.screenCache.cache) == 0 || time.Now().Sub(server.screenCache.last).Seconds() > 1 {
 							server.screenCache.last = time.Now()
 							server.screenCache.cache, err = cell.GetScreen()
@@ -215,9 +210,10 @@ func (server *cellServer) poller(cell *cell.CellAdvisor, threadNumber int) {
 			}
 			sendResult(done, request.result, pollResult{code, isbinary, data})
 		case <-time.After(server.pollPeriod):
-			r := createRequest("heartbeat", nil)
-			server.requestChannel <- r
-			<-r.result
+			server.mutex.Lock()
+			data, err = cell.GetStatusMessage()
+			log.Printf("Thread(%d): %s", threadNumber, data)
+			server.mutex.Unlock()
 		}
 		//Check Error Status == EOF
 		if err != nil {
