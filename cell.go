@@ -74,6 +74,10 @@ func (cl CellAdvisor) GetMessage() ([]byte, error) {
 	return bufResult, nil
 }
 
+func (cl *CellAdvisor) Reinitialize() {
+	cl.initCellAdvisor()
+}
+
 func (cl *CellAdvisor) initCellAdvisor() {
 
 	conn, err := net.Dial("tcp", cl.ip+JDProtocolPort)

@@ -74,7 +74,7 @@ var (
 			argument:     map[string]string{},
 			expected:     "JFIF",
 			expectedCode: http.StatusOK,
-			expectedType: "application/jpeg",
+			expectedType: "image/jpeg",
 		},
 		testData{
 			subject:      "Unknown command : ",

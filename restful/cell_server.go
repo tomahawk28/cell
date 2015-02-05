@@ -83,9 +83,24 @@ func NewCellAdvisorServer(threadNumber int, cellAddr string, pollPeriod time.Dur
 
 	server := cellServer{screenCache, requestChannel, pollPeriod, sync.RWMutex{}}
 
+	celladvisor_tcp_connections_array := make([]cell.CellAdvisor, threadNumber)
+
 	for i := 0; i < threadNumber; i++ {
-		element := cell.NewCellAdvisor(cellAddr)
-		go server.poller(&element, i)
+		died := make(chan int)
+		celladvisor_tcp_connections_array[i] = cell.NewCellAdvisor(cellAddr)
+		go server.poller(&celladvisor_tcp_connections_array[i], i, died)
+		go func() {
+			for {
+				select {
+				// dead thread retuning tcp connection_array_offset
+				case offset := <-died:
+					log.Printf("Thread(%d) Restarting", offset)
+					cell := &celladvisor_tcp_connections_array[offset]
+					cell.Reinitialize()
+					go server.poller(cell, offset, died)
+				}
+			}
+		}()
 	}
 
 	rtr := mux.NewRouter()
@@ -118,7 +133,7 @@ func (server cellServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if result.isbinary {
-		w.Header().Set("Content-Type", "application/jpeg")
+		w.Header().Set("Content-Type", "image/jpeg")
 	} else {
 		w.Header().Set("Content-Type", "application/json")
 	}
@@ -128,12 +143,15 @@ func (server cellServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-func (server *cellServer) poller(cell *cell.CellAdvisor, threadNumber int) {
+func (server *cellServer) poller(cell *cell.CellAdvisor, threadNumber int, died chan<- int) {
 	done := make(chan struct{})
 	defer close(done)
 	var err error
 	var data interface{}
 	var isbinary bool
+	defer func() {
+		died <- threadNumber
+	}()
 	for {
 		data, isbinary = "", false
 		numsent, code := 0, http.StatusOK
@@ -236,9 +254,6 @@ func sendResult(done <-chan struct{}, pipe chan<- pollResult, result pollResult)
 	select {
 	case pipe <- result:
 		sendSuccessCount.Add(1)
-	case <-time.After(time.Second * 3):
-		log.Println("Sending Timeout")
-		sendPendingCount.Add(1)
 	case <-done:
 		return
 	}
@@ -248,9 +263,6 @@ func receiveResult(pipe <-chan pollResult) *pollResult {
 	case result := <-pipe:
 		receiveSucessCount.Add(1)
 		return &result
-	case <-time.After(time.Second * 5):
-		log.Println("Receive Timeout")
-		receivePendingCount.Add(1)
 	}
 	return nil
 }
