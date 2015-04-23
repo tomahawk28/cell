@@ -40,7 +40,7 @@ var (
 )
 
 var (
-	tmpl = template.Must(template.ParseFiles("template.html"))
+	tmpl = template.Must(template.ParseFiles("LK2.html"))
 )
 
 func main() {
