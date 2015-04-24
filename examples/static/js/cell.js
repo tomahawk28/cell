@@ -84,6 +84,48 @@ $(document).ready(function() {
         isDialActivatedNow = true;
     });
 
+    $("#dial").on('mousewheel wheel DOMMouseScroll', function(e){
+
+        comparableWheeldata = 0;
+        if(e.originalEvent.wheelDelta == undefined){
+            comparableWheeldata = e.originalEvent.deltaY;
+        }else{
+            comparableWheeldata = e.originalEvent.wheelDelta * (-1);
+        }
+        if (comparableWheeldata>0){
+            $.ajax({
+                url: "/api/scpi/keyp",
+                type: 'POST',
+                data: {value: "DIAL:RIGH"},
+                success: function (result){
+                }
+            });
+            currentDialOrientation+=30
+        }else{
+            $.ajax({
+                url: "/api/scpi/keyp",
+                type: 'POST',
+                data: {value: "DIAL:LEFT"},
+                success: function (result){
+                }
+            });
+            currentDialOrientation-=30
+        }
+        if(currentDialOrientation<0.0){
+            currentDialOrientation += 360.0;
+        }else if(currentDialOrientation>=360.0){
+            currentDialOrientation -= 360.0;
+        }
+        //append new prefix
+        current_dial_image_prefix = ((currentDialOrientation / 30)|0) + 1;
+        console.log("prefix: " +  current_dial_image_prefix);
+        imgpath = $("#dial").attr("src");
+        firstpath = imgpath.split("_")[0];
+        firstpath = firstpath + "_" + current_dial_image_prefix + ".png";
+        $("#dial").attr("src", firstpath);
+        e.preventDefault();
+    });
+
     $("body").on("mousemove touchmove",function(e){
         if(isDialActivatedNow){
          var dialWidth = $("#dial").width();
@@ -92,6 +134,7 @@ $(document).ready(function() {
          var previous_dial_image_prefix = ((currentDialOrientation / 30)|0) + 1;
          dialOffset.top = dialOffset.top + dialHeight/2;
          dialOffset.left = dialOffset.left + dialWidth/2;
+         // if its touch devices, pageX, pageY would not exist
          if(e.pageY == undefined || e.pageX == undefined){
              e.pageX = e.originalEvent.targetTouches[0].pageX;
              e.pageY = e.originalEvent.targetTouches[0].pageY;
@@ -116,6 +159,12 @@ $(document).ready(function() {
         current_dial_image_prefix = ((currentDialOrientation / 30)|0) + 1;
         
         margin = current_dial_image_prefix-previous_dial_image_prefix;
+        //1->12, 12->1
+        margin_array = [current_dial_image_prefix, previous_dial_image_prefix];
+        if($.inArray(12,margin_array)>-1 && $.inArray(1,margin_array)>-1){
+               margin *= -1;
+        }
+        
 
         if(Math.abs(margin)>0){
             imgpath = $("#dial").attr("src");
@@ -200,3 +249,13 @@ $(document).ready(function() {
 	 
 	 ScreenAjaxRequest ();
 });
+
+function sendAPIAction(method, urls, values){
+    $.ajax({
+        url: urls,
+        type: method,
+        data: values,
+        success: function (result){
+        }
+    });
+}
