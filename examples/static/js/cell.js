@@ -77,8 +77,18 @@ document_instance.on('touchmove', function(e) {
         }
 });
 document_instance.ready(function() {
+
+    $('.cell').load(function(){
+        completeStatus();
+    });
+
+    $('#dial').on('dragstart', function(e){
+        e.preventDefault();
+    });
+
     $('#dial').on('mousedown touchstart',function(e){
         isDialActivatedNow = true;
+        e.preventDefault();
     });
 
     $('#dial').on('mousewheel wheel DOMMouseScroll', function(e){
@@ -90,7 +100,7 @@ document_instance.ready(function() {
             comparableWheeldata = e.originalEvent.wheelDelta * (-1);
         }
         if (comparableWheeldata>0){
-            sendAPIAction('POST', '/api/scpi/keyp', {value: 'DIAL:RIGH'});
+            sendRightKnobSignal();
             currentDialOrientation+=30
         }else{
             sendAPIAction('POST', '/api/scpi/keyp', {value: 'DIAL:LEFT'});
@@ -159,7 +169,7 @@ document_instance.ready(function() {
                 dial.attr('src', firstpath);
             }
             if(margin>0){
-                sendAPIAction('POST', '/api/scpi/keyp', {value: 'DIAL:RIGH'});
+                sendRightKnobSignal();
             }else if(margin<0){
                 sendAPIAction('POST', '/api/scpi/keyp', {value: 'DIAL:LEFT'});
             }
@@ -173,11 +183,12 @@ document_instance.ready(function() {
 
 	  $('.cell').each(function(i){
 		 $(this).click(function(e) {
-			var offset = $(this).offset();
+            var cell = $(this);
+			var offset = cell.offset();
 			x= e.pageX - offset.left
 			y= e.pageY - offset.top
-			x= parseInt(x*1.176)
-			y= parseInt(y*1.176)
+			x= parseInt(x*real_width/cell.width());
+			y= parseInt(y*real_height/cell.height());
             sendAPIAction('POST', '/api/scpi/touch', {x: x, y: y});
 		});
 	 });
@@ -218,4 +229,14 @@ function sendAPIAction(method, urls, values){
         success: function (result){
         }
     });
+}
+
+function sendRightKnobSignal(){
+    //for handling idiosyncrasy things in our product,
+    //we figure out what we are using now (LK2, CAA) by its own screenshot height
+    if(real_height==480){
+        sendAPIAction('POST', '/api/scpi/keyp', {value: 'DIAL:RIGHT'});
+    }else{
+        sendAPIAction('POST', '/api/scpi/keyp', {value: 'DIAL:RIGH'});
+    }
 }

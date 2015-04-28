@@ -37,15 +37,13 @@ var (
 	cellAdvisorAddr = flag.String("celladdr", "10.82.26.12", "CellAdvisor Address")
 	numsport        = flag.Uint("numsport", 4, "The number of ports ")
 	pollPeriod      = flag.Duration("poll", 10*time.Second, "Poll Period")
-)
-
-var (
-	tmpl = template.Must(template.ParseFiles("LK2.html"))
+	templateFile    = flag.String("template", "./LK2.html", "Template File")
 )
 
 func main() {
 
 	flag.Parse()
+	tmpl := template.Must(template.ParseFiles(*templateFile))
 
 	api := restful.NewCellAdvisorServer(int(*numsport), *cellAdvisorAddr, *pollPeriod)
 
