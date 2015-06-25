@@ -85,14 +85,14 @@ func NewCellAdvisorServer(threadNumber int, cellAddr string, pollPeriod time.Dur
 
 	celladvisor_tcp_connections_array := make([]cell.CellAdvisor, threadNumber)
 
+	died := make(chan int)
 	for i := 0; i < threadNumber; i++ {
-		died := make(chan int)
 		celladvisor_tcp_connections_array[i] = cell.NewCellAdvisor(cellAddr)
 		go server.poller(&celladvisor_tcp_connections_array[i], i, died)
 		go func() {
 			for {
 				select {
-				// dead thread retuning tcp connection_array_offset
+				// dead thread retuning celladvisor_tcp_connections_array offset
 				case offset := <-died:
 					log.Printf("Thread(%d) Restarting", offset)
 					cell := &celladvisor_tcp_connections_array[offset]
@@ -137,6 +137,7 @@ func (server cellServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	} else {
 		w.Header().Set("Content-Type", "application/json")
 	}
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.WriteHeader(result.code)
 	fmt.Fprintf(w, "%s", result)
 	//w.Write([]byte(result.requestErr.Error()))
