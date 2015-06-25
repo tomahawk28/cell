@@ -33,11 +33,11 @@ import (
 )
 
 var (
-	httpAddr        = flag.String("http", ":8040", "Listen Address")
-	cellAdvisorAddr = flag.String("celladdr", "10.82.26.12", "CellAdvisor Address")
+	httpAddr        = flag.String("http", ":80", "Listen Address")
+	cellAdvisorAddr = flag.String("celladdr", "127.0.0.1", "CellAdvisor Address")
 	numsport        = flag.Uint("numsport", 4, "The number of ports ")
 	pollPeriod      = flag.Duration("poll", 10*time.Second, "Poll Period")
-	templateFile    = flag.String("template", "./LK2.html", "Template File")
+	templateFile    = flag.String("template", "/gencomm/cell/LK2.html", "Template File")
 )
 
 func main() {
@@ -55,7 +55,7 @@ func main() {
 			panic(err)
 		}
 	})
-	fs := http.FileServer(http.Dir("static"))
+	fs := http.FileServer(http.Dir("/gencomm/cell/static"))
 	http.Handle("/static/", http.StripPrefix("/static/", fs))
 	log.Fatal(http.ListenAndServe(*httpAddr, nil))
 }
